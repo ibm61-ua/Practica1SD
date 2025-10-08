@@ -8,4 +8,18 @@
   <groupId>es.ua.sd.practica</groupId>
   <artifactId>evcharging-common</artifactId>
   <version>0.0.1-SNAPSHOT</version>
+  
+  <dependencies>
+    <dependency>
+    	<groupId>org.apache.kafka</groupId>
+    	<artifactId>kafka-clients</artifactId>
+    	<version>3.6.1</version> 
+    </dependency>
+    <dependency>
+	    <groupId>ch.qos.logback</groupId>
+	    <artifactId>logback-core</artifactId>
+	    <version>1.4.14</version> 
+	</dependency>
+      
+  </dependencies>
 </project>

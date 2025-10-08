@@ -20,22 +20,12 @@ public class EV_Central {
             gui.addChargingPoint("CP002");
             // ... Aquí arrancarías los servicios de Sockets y Kafka
         });
-        // 1. INICIAR EL SERVIDOR DE SOCKETS (Para Registro/Autenticación de CPs)
-        // Se ejecuta en un hilo separado para no bloquear el main.
         
-        // 2. INICIAR LOS SERVICIOS DE KAFKA (Consumidores y Productores)
-        
-        // Consumidor 1: Recibe solicitudes de recarga del EV_Driver (ev_requests)
-        // Aquí debes iniciar un hilo o servicio que escuche este tópico.
-        // new Thread(new KafkaConsumerService(CommonConstants.TOPIC_REQUESTS)).start();
-        
-        // Consumidor 2: Recibe telemetría de consumo del EV_CP_E (ev_telemetry)
-        // Aquí debes iniciar un hilo o servicio que escuche este tópico.
-        // new Thread(new KafkaConsumerService(CommonConstants.TOPIC_TELEMETRY)).start();
-
-        // 3. PANTALLA DE MONITORIZACIÓN Y CONTROL (Opcional en el main)
-        // Puedes iniciar la interfaz de usuario/consola aquí para mostrar el estado de los CPs.
-        // System.out.println("✅ Central operativa. Monitoreando consola para comandos de mantenimiento...");
+        String brokerIP = "192.168.1.24:9092"; 
+        String topic = "mensaje"; 
+        // Identificador del grupo (debe ser el mismo para consumidores que trabajan juntos)
+        String groupId = "ev"; 
+        new Consumer(brokerIP, topic, groupId).run();
     }
     
     /**

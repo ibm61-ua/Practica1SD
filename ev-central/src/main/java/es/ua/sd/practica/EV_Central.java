@@ -21,7 +21,7 @@ public class EV_Central {
             // ... Aquí arrancarías los servicios de Sockets y Kafka
         });
         
-        String brokerIP = "192.168.1.24:9092"; 
+        String brokerIP = args[0]; 
         String topic = "mensaje"; 
         // Identificador del grupo (debe ser el mismo para consumidores que trabajan juntos)
         String groupId = "ev"; 

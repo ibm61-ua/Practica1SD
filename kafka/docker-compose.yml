@@ -24,3 +24,23 @@ services:
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://${HOST_IP}:9092
       # Necesario en entornos de prueba (1 broker)
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  kafka-topics-creator:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: kafka-topics-creator
+    depends_on:
+      - kafka
+    command: 
+      - /bin/bash
+      - -c
+      - |
+        echo "Esperando a que kafka se inicie..."
+        sleep 15
+        
+        kafka-topics --create --topic ev_request --if-not-exists --bootstrap-server kafka:9092 --partitions 1 --replication-factor 1
+        
+        kafka-topics --create --topic ev_telemetry --if-not-exists --bootstrap-server kafka:9092 --partitions 1 --replication-factor 1
+        
+        kafka-topics --create --topic ev_control --if-not-exists --bootstrap-server kafka:9092 --partitions 1 --replication-factor 1
+
+  

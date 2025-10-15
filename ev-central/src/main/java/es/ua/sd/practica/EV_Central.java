@@ -10,23 +10,63 @@ import javax.swing.*;
 import java.awt.*;
 
 import es.ua.sd.practica.CommonConstants;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.util.Scanner;
 
 public class EV_Central {
+	public static String brokerIP;
+  
 	public static void main(String[] args) {
-        System.out.println("Iniciando EV_Central (Servidor de Control)...");
         SwingUtilities.invokeLater(() -> {
             CentralMonitorGUI gui = new CentralMonitorGUI();
-            gui.addChargingPoint("CP001");
-            gui.addChargingPoint("CP002");
-            // ... Aquí arrancarías los servicios de Sockets y Kafka
+            AddChargingPointFromDB(gui);
+            OnGoingPanel(gui);
+            MessagePanel(gui);
         });
         
-        String brokerIP = args[0]; 
-        String topic = "mensaje"; 
-        // Identificador del grupo (debe ser el mismo para consumidores que trabajan juntos)
+        brokerIP = args[0]; 
+        String topicRequest = CommonConstants.REQUEST; 
+        String topicTelemetry = CommonConstants.TELEMETRY;
+        String topicControl = CommonConstants.CONTROL;
+        
         String groupId = "ev"; 
-        new Consumer(brokerIP, topic, groupId).run();
+        CentralLogic centralLogic = new CentralLogic();
+        Runnable consumerRequest = new KConsumer(brokerIP, topicRequest, groupId, centralLogic::handleRequest);
+        Runnable consumerTelemetry = new KConsumer(brokerIP, topicTelemetry, groupId, centralLogic::handleTelemetry);
+
+        
+        new Thread(consumerTelemetry).start();
+        new Thread(consumerRequest).start();
     }
+	
+	public static void AddChargingPointFromDB(CentralMonitorGUI gui)
+	{
+		try {
+            File archivo = new File("cpdatabase.txt");
+            Scanner s = new Scanner(archivo);
+
+            while (s.hasNextLine()) {
+                String linea = s.nextLine();
+                gui.addChargingPoint(linea);
+            }
+
+            s.close();
+        } catch (FileNotFoundException e) {
+            System.out.println("No se encontró el archivo.");
+            e.printStackTrace();
+        }
+	}
+	
+	public static void OnGoingPanel(CentralMonitorGUI gui)
+	{
+		 gui.OnGoingPanel("");
+	}
+	
+	public static void MessagePanel(CentralMonitorGUI gui)
+	{
+		 gui.MessagePanel("");
+	}
     
     /**
      * Inicia el ServerSocket y espera nuevas conexiones de EV_CP_M.

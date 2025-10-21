@@ -1,6 +1,7 @@
 package es.ua.sd.practica;
 
 import java.util.Iterator;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import javax.swing.SwingUtilities;
@@ -19,7 +20,7 @@ public class EV_Driver {
 		}
 		DeserializeARGS(args);
 
-		Runnable consumerControl = new KConsumer(IP_BROKER + ":" + Port_BROKER, CommonConstants.CONTROL, "evdriver", EV_Driver::handleControl);
+		Runnable consumerControl = new KConsumer(IP_BROKER + ":" + Port_BROKER, CommonConstants.CONTROL, UUID.randomUUID().toString(), EV_Driver::handleControl);
 		new Thread(consumerControl).start();
 		Producer p = new Producer(IP_BROKER + ":" + Port_BROKER, CommonConstants.REQUEST);
 		SwingUtilities.invokeLater(() -> {
@@ -43,7 +44,6 @@ public class EV_Driver {
 	
 	public static void handleControl(String message) {
 		//mensaje ejemplo: CHARGING#ALC001#DV001#10.0#10.0
-		System.out.println(message);
 		if(!message.contains(ID_Driver)) return;
 		
 		if(!message.split("#")[0].equals("END") && !message.split("#")[0].equals("CHARGING") && !message.split("#")[0].equals("NOAVIABLE")) return;

@@ -1,5 +1,5 @@
-ALC001;0.35;Carrer de Sant Vicent;AVERIADO
-ALC002;0.40;Avenida de Aguilera;AVERIADO
+ALC001;0.35;Carrer de Sant Vicent;CARGANDO
+ALC002;0.40;Avenida de Aguilera;CONECTADO
 ALC003;0.30;Calle de la Paz;DESCONECTADO
 BAR001;0.35;Carrer de Sant Vicent;DESCONECTADO
 BAR002;0.40;Avenida de Aguilera;DESCONECTADO

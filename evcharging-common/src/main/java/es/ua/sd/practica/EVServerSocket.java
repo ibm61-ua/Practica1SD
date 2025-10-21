@@ -22,8 +22,6 @@ public class EVServerSocket implements Runnable{
                 
                 Socket clientSocket = serverSocket.accept(); 
                 
-                System.out.println("Nueva conexión entrante: " + clientSocket.getInetAddress().getHostAddress());
-
                 Runnable clientHandler = new EVClientHandler(clientSocket, handler);
                 new Thread(clientHandler).start();
             }

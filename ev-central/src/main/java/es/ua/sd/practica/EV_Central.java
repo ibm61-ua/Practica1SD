@@ -1,6 +1,8 @@
 package es.ua.sd.practica;
 
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.util.ArrayList;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.concurrent.ExecutorService;
@@ -12,20 +14,32 @@ import java.awt.*;
 import es.ua.sd.practica.CommonConstants;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileWriter;
 import java.util.Scanner;
 
 public class EV_Central {
 	public static String brokerIP;
+	public static int port;
+	public static ArrayList<CP> cps = new ArrayList<>();
+	public static CentralMonitorGUI gui;
   
 	public static void main(String[] args) {
+		if (args.length < 2) 
+		{
+			System.err.println("Pase por argumentos el puerto del socket y la IP y puerto del broker ");
+			return;
+		}
+		AddChargingPointFromDB();
         SwingUtilities.invokeLater(() -> {
-            CentralMonitorGUI gui = new CentralMonitorGUI();
-            AddChargingPointFromDB(gui);
+            gui = new CentralMonitorGUI(cps);
+            AddCPToGui(gui);
             OnGoingPanel(gui);
             MessagePanel(gui);
         });
         
-        brokerIP = args[0]; 
+        port = Integer.parseInt(args[0	]);
+        brokerIP = args[1];
+        
         String topicRequest = CommonConstants.REQUEST; 
         String topicTelemetry = CommonConstants.TELEMETRY;
         String topicControl = CommonConstants.CONTROL;
@@ -38,9 +52,45 @@ public class EV_Central {
         
         new Thread(consumerTelemetry).start();
         new Thread(consumerRequest).start();
+        
+        Runnable EVServer = new EVServerSocket(port, centralLogic::handleCP);
+        new Thread(EVServer).start();
+        
+        Runnable checker = new HeartbeatChecker(centralLogic.getLastHeartbeat());
+        new Thread(checker).start();
     }
 	
-	public static void AddChargingPointFromDB(CentralMonitorGUI gui)
+	
+	private static void AddCPToGui(CentralMonitorGUI gui) {
+		for(CP cp : cps)
+		{
+			gui.addChargingPoint(cp);
+		}
+		
+	}
+	
+	public static void Serialize()
+	{
+		try (FileWriter fileWriter = new FileWriter("cpdatabase.txt", false); PrintWriter printWriter = new PrintWriter(fileWriter)) {
+
+				for (CP cp : cps)
+				{
+					String str = cp.UID + ";" + cp.Price + ";" + cp.Location + ";" + cp.State;
+		            printWriter.println(str);
+				}
+	        } catch (IOException e) {
+	            System.err.println("Error al escribir en el archivo: " + e.getMessage());
+	        }
+	}
+	
+	protected static void refreshChargingPoints(CentralMonitorGUI gui) {
+		Serialize();
+	    gui.clearAllChargingPoints(); 
+	    AddCPToGui(gui); 
+	}
+
+
+	public static void AddChargingPointFromDB()
 	{
 		try {
             File archivo = new File("cpdatabase.txt");
@@ -48,7 +98,9 @@ public class EV_Central {
 
             while (s.hasNextLine()) {
                 String linea = s.nextLine();
-                gui.addChargingPoint(linea);
+                String[] splited = linea.split(";");
+                CP cp = new CP(splited[0], splited[1], splited[2], "DESCONECTADO");
+                cps.add(cp);
             }
 
             s.close();
@@ -56,6 +108,8 @@ public class EV_Central {
             System.out.println("No se encontró el archivo.");
             e.printStackTrace();
         }
+		
+		
 	}
 	
 	public static void OnGoingPanel(CentralMonitorGUI gui)
@@ -68,8 +122,4 @@ public class EV_Central {
 		 gui.MessagePanel("");
 	}
     
-    /**
-     * Inicia el ServerSocket y espera nuevas conexiones de EV_CP_M.
-     * Utiliza un Thread Pool para manejar la concurrencia.
-     */
 }

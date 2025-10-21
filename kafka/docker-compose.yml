@@ -38,6 +38,8 @@ services:
         sleep 15
         
         kafka-topics --create --topic ev_request --if-not-exists --bootstrap-server kafka:9092 --partitions 1 --replication-factor 1
+
+        kafka-topics --create --topic ev_requestcp --if-not-exists --bootstrap-server kafka:9092 --partitions 1 --replication-factor 1
         
         kafka-topics --create --topic ev_telemetry --if-not-exists --bootstrap-server kafka:9092 --partitions 1 --replication-factor 1
         

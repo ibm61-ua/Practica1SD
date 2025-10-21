@@ -4,9 +4,14 @@ import javax.swing.*;
 import javax.swing.border.TitledBorder;
 
 import java.awt.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 public class MonitorGUI extends JFrame {
 	private JPanel panelPrincipal;
+	private List<String> message = Collections.synchronizedList(new ArrayList<>());
 
 	public MonitorGUI(String name) {
 		super(name + " - Monitor");
@@ -20,36 +25,44 @@ public class MonitorGUI extends JFrame {
 
 		this.add(panelPrincipal);
 		setVisible(true);
-
+	}
+	
+	void NewMessage(String message)
+	{
+		Clear();
+		if (this.message.size() > 25)
+		{
+			this.message.remove(0);
+		}
+		this.message.add(message);
+		PrintMessage();
 	}
 
-	void Message(String message) {
+	void PrintMessage() {
 		JPanel MPanel = new JPanel();
 		MPanel.setLayout(new BoxLayout(MPanel, BoxLayout.Y_AXIS));
 		MPanel.setBorder(BorderFactory.createTitledBorder("Status"));
 		MPanel.setBackground(Color.WHITE);
-		JLabel label = new JLabel(message);
-		label.setForeground(Color.BLACK);
+		
+		for(String message : this.message)
+		{
+			JLabel label = new JLabel(message);
+			label.setForeground(Color.BLACK);
 
-		Font fuenteActual = label.getFont();
-		Font fuenteNueva = new Font(fuenteActual.getName(), fuenteActual.getStyle(), 16);
-		label.setFont(fuenteNueva);
+			Font fuenteActual = label.getFont();
+			Font fuenteNueva = new Font(fuenteActual.getName(), fuenteActual.getStyle(), 16);
+			label.setFont(fuenteNueva);
 
-		MPanel.add(label);
-
+			MPanel.add(label);
+		}
+		
 		panelPrincipal.add(MPanel);
 		this.revalidate();
 		this.repaint();
 	}
-
-	void ButtonPressed() {
-		JPanel MPanel = new JPanel();
-		MPanel.setLayout(new BoxLayout(MPanel, BoxLayout.Y_AXIS));
-		MPanel.setBorder(BorderFactory.createTitledBorder("Status"));
-		MPanel.setBackground(Color.WHITE);
-
-		panelPrincipal.add(MPanel);
-		this.revalidate();
-		this.repaint();
+	
+	void Clear()
+	{
+		panelPrincipal.removeAll();
 	}
 }

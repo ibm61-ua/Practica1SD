@@ -15,6 +15,11 @@
           <artifactId>evcharging-common</artifactId>
           <version>0.0.1-SNAPSHOT</version>
       </dependency>
-      
+
+      <dependency>
+      	<groupId>es.ua.sd.practica</groupId>
+      	<artifactId>ev-cp-monitor</artifactId>
+      	<version>0.0.1-SNAPSHOT</version>
+      </dependency>
   </dependencies>
 </project>

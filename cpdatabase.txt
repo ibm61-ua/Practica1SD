@@ -1,12 +1,12 @@
-ALC001;0.35;Carrer de Sant Vicent;38.345;-0.490
-ALC002;0.40;Avenida de Aguilera;38.339;-0.485
-ALC003;0.30;Calle de la Paz;38.351;-0.488
-BAR001;0.35;Carrer de Sant Vicent;38.345;-0.490
-BAR002;0.40;Avenida de Aguilera;38.339;-0.485
-BAR003;0.30;Calle de la Paz;38.351;-0.488
-MAD001;0.35;Carrer de Sant Vicent;38.345;-0.490
-MAD002;0.40;Avenida de Aguilera;38.339;-0.485
-MAD003;0.30;Calle de la Paz;38.351;-0.488
-SEV001;0.35;Carrer de Sant Vicent;38.345;-0.490
-SEV002;0.40;Avenida de Aguilera;38.339;-0.485
-SEV003;0.30;Calle de la Paz;38.351;-0.488
+ALC001;0.35;Carrer de Sant Vicent;AVERIADO
+ALC002;0.40;Avenida de Aguilera;AVERIADO
+ALC003;0.30;Calle de la Paz;DESCONECTADO
+BAR001;0.35;Carrer de Sant Vicent;DESCONECTADO
+BAR002;0.40;Avenida de Aguilera;DESCONECTADO
+BAR003;0.30;Calle de la Paz;DESCONECTADO
+MAD001;0.35;Carrer de Sant Vicent;DESCONECTADO
+MAD002;0.40;Avenida de Aguilera;DESCONECTADO
+MAD003;0.30;Calle de la Paz;DESCONECTADO
+SEV001;0.35;Carrer de Sant Vicent;DESCONECTADO
+SEV002;0.40;Avenida de Aguilera;DESCONECTADO
+SEV003;0.30;Calle de la Paz;DESCONECTADO

@@ -31,7 +31,7 @@ public class HeartbeatChecker extends EV_Central implements Runnable {
                 		if(cp.UID.equals(cpId) && !cp.State.equals("DESCONECTADO"))
                 		{
                 			cp.State = "DESCONECTADO";
-                			refreshChargingPoints(gui);
+                			javax.swing.SwingUtilities.invokeLater(() -> refreshChargingPoints(gui));
                 		}
                 	}
                 }

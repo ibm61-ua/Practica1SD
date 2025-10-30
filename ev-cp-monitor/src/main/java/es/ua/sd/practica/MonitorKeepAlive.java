@@ -24,14 +24,19 @@ public class MonitorKeepAlive implements Runnable {
         while (!Thread.currentThread().isInterrupted()) {
             
             EVClient cpClient = new EVClient(ipCentral, portCentral);
-            
             if (cpClient.startConnection()) {
-                
+            	
+            	gui.NewMessage("[Monitor] Creada Conexión con Central.");
                 try {
                     while (!Thread.currentThread().isInterrupted()) {
-                        
                         String statusRequest = "KEEPALIVE#" + cpID;
-                        cpClient.sendOnly(statusRequest);
+                        try {
+							cpClient.sendOnly(statusRequest);
+						} catch (IOException e) {
+							System.out.println(e);
+							gui.NewMessage("[Monitor] Perdida Conexión con Central.");
+							break;
+						}
                         
                         TimeUnit.SECONDS.sleep(HEARTBEAT_INTERVAL_SECONDS); 
                     }
@@ -48,6 +53,7 @@ public class MonitorKeepAlive implements Runnable {
                 try {
                     TimeUnit.SECONDS.sleep(1); 
                 } catch (InterruptedException e) {
+                	System.out.println(e);
                     Thread.currentThread().interrupt();
                 }
             }

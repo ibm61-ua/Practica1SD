@@ -1,5 +1,9 @@
 package es.ua.sd.practica;
 
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.sql.Time;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -11,12 +15,19 @@ import java.util.concurrent.ConcurrentHashMap;
 public class CentralLogic extends EV_Central {
 	private final Map<String, Instant> lastHeartbeat = new ConcurrentHashMap<>();
 	public void handleRequest(String message) {
+		//Si el driver pide actualizar los CPS
+		if(message.equals("RELOAD"))
+		{
+			handleReload();
+			return;
+		}
+		
 		String kwh = null;
 		for(CP cp : cps)
 		{
 			if(cp.UID.equals(message.split("#")[1].split(";")[0]))
 			{
-				if(cp.State.equals("DESCONECTADO") || cp.State.equals("AVERIADO") || cp.State.equals("PARADO"))
+				if(cp.State.equals("DESCONECTADO") || cp.State.equals("AVERIADO") || cp.State.equals("PARADO") || cp.State.equals("CARGANDO") )
 				{
 					Producer r = new Producer(super.brokerIP, CommonConstants.TELEMETRY);
 					r.sendMessage("NOAVIABLE#" + message.split("#")[3]);
@@ -41,7 +52,20 @@ public class CentralLogic extends EV_Central {
 		r.close();
     }
 
-    public void handleTelemetry(String message) {
+    private void handleReload() {
+    	String message = "RELOAD#";
+    	
+    	for (CP cp : cps)
+    	{
+    		message += cp.toString() + "|";
+    	}
+    	Producer r = new Producer(super.brokerIP, CommonConstants.CONTROL);
+		r.sendMessage(message);
+		r.close();
+	}
+
+	public void handleTelemetry(String message) {
+		String telemetry = message;
     	if(message.contains("END"))
     	{
     		for(CP cp : cps)
@@ -60,12 +84,13 @@ public class CentralLogic extends EV_Central {
     				}
     				gui.OnGoingPanel("");
     				gui.refreshChargingPoints();
+    				telemetry += "#Precio: " + Float.parseFloat(cp.Price) * cp.KWHRequested + " euros.";
     			}
     		}
     		gui.deleteOnGoinMessage(message.split("#")[1]);
     	}
         Producer r = new Producer(super.brokerIP, CommonConstants.CONTROL);
-		r.sendMessage(message);
+		r.sendMessage(telemetry);
 		r.close();
     }
     
@@ -74,39 +99,43 @@ public class CentralLogic extends EV_Central {
     	String type = message.split("#")[0]; //ejemplo mensaje CONNECTION#CP001 -> buscamos el CONNECTION
     	String cpUID = message.split("#")[1]; //ejemplo mensaje CONNECTION#CP001 -> buscamos el CP001
     	
+    	if(type.equals("ALTA"))
+    	{
+    		newCP(cpUID, message.split("#")[2], message.split("#")[3]);
+    	}
     	
     	this.getLastHeartbeat().put(cpUID, Instant.now());
     	
-    	if(type.equals("CONNECTION"))
+    	if(type.equals("CONNECTION") || type.equals("ALTA"))
     	{
-    		for(CP cp : super.cps)
+    		for(CP cp : cps)
         	{
         		if(cp.UID.equals(cpUID) && !cp.State.equals("CONECTADO"))
         		{
         			cp.State = "CONECTADO";
-        			super.refreshChargingPoints(super.gui);
+        			javax.swing.SwingUtilities.invokeLater(() -> refreshChargingPoints(gui));
         		}
         	}
     	}
     	else if(type.equals("KEEPALIVE"))
     	{
-    		for(CP cp : super.cps)
+    		for(CP cp : cps)
         	{
         		if(cp.UID.equals(cpUID) && cp.State.equals("DESCONECTADO"))
         		{
         			cp.State = "CONECTADO";
-        			super.refreshChargingPoints(super.gui);
+        			javax.swing.SwingUtilities.invokeLater(() -> refreshChargingPoints(gui));
         		}
         	}
     	}
     	else if(type.equals("ERROR"))
     	{
-    		for(CP cp : super.cps)
+    		for(CP cp : cps)
         	{
         		if(cp.UID.equals(cpUID))
         		{
         			cp.State = "AVERIADO";
-        			super.refreshChargingPoints(super.gui);
+        			javax.swing.SwingUtilities.invokeLater(() -> refreshChargingPoints(gui));
         		}
         	}
     	}
@@ -115,6 +144,31 @@ public class CentralLogic extends EV_Central {
 
 	public Map<String, Instant> getLastHeartbeat() {
 		return lastHeartbeat;
+	}
+	
+	public void newCP(String cpid, String location, String Price)
+	{
+		for(CP cp : cps)
+    	{
+    		if(cp.UID.equals(cpid))
+    		{
+    			return;
+    		}
+    	}
+		
+		
+		try (FileWriter fw = new FileWriter("cpdatabase.txt", true);
+	        BufferedWriter bw = new BufferedWriter(fw);
+	        PrintWriter out = new PrintWriter(bw)) {
+
+	        out.println(cpid + ";" + Price + ";" + location + ";DESCONECTADO");
+
+		    } catch (IOException e) {
+		        System.err.println("Error al escribir en cpdatabase.txt: " + e.getMessage());
+		    }
+		
+		CP cp = new CP(cpid, Price, location, "DESCONECTADO");
+        cps.add(cp);
 	}
     
 

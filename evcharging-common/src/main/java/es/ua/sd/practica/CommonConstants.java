@@ -7,5 +7,6 @@ public class CommonConstants {
 	public static String REQUEST_CP = "ev_requestcp";
 	public static String TELEMETRY = "ev_telemetry"; 
 	public static String CONTROL = "ev_control"; 
+	public static String CENTRAL_STATUS = "ev_central_status"; 
 	
 }

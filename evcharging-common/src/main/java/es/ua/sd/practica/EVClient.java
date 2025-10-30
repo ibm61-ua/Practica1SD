@@ -52,15 +52,15 @@ public class EVClient {
         }
     }
     
-    public void sendOnly(String msg) {
+    public void sendOnly(String msg) throws IOException {
         if (out == null) {
-            System.err.println("Error: Conexión no iniciada.");
-            return;
+            throw new IOException("Error: Conexión no iniciada.");
         }
-        
-	    out.println(msg);
-	    return;
-    
+
+        out.println(msg);
+        if (out.checkError()) {
+            throw new IOException("Error al enviar mensaje, conexión posiblemente cerrada.");
+        }
     }
 
     public void stopConnection() {

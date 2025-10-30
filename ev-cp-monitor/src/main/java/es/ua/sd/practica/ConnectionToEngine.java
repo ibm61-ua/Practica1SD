@@ -29,8 +29,8 @@ public class ConnectionToEngine extends EV_CP_M implements Runnable {
             	super.EngineAlive();
                 try {
                     while (isConnected && !Thread.currentThread().isInterrupted()) {
+                   
                         String statusRequest = "CONNECTION#" + ID_CP;
-                        
                         String response = cpClient.sendMessage(statusRequest); 
                         
                         if (response != null) {

@@ -11,7 +11,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 public class MonitorGUI extends JFrame {
 	private JPanel panelPrincipal;
-	private List<String> message = Collections.synchronizedList(new ArrayList<>());
+	private List<String> message = new CopyOnWriteArrayList<>();
 
 	public MonitorGUI(String name) {
 		super(name + " - Monitor");

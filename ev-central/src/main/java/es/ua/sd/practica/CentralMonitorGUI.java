@@ -79,13 +79,13 @@ public class CentralMonitorGUI extends JFrame {
 			label.setFont(fuenteNueva);
 			cpPanel.add(label);
 			
-			label = new JLabel(cp.driver);
+			label = new JLabel("Driver: " + cp.driver);
 			label.setForeground(Color.WHITE);
 
 			label.setFont(fuenteNueva);
 			cpPanel.add(label);
 			
-			label = new JLabel(String.valueOf(cp.KWHRequested));
+			label = new JLabel(String.valueOf(cp.KWHRequested) + "KwH");
 			label.setForeground(Color.WHITE);
 
 			label.setFont(fuenteNueva);
@@ -93,7 +93,7 @@ public class CentralMonitorGUI extends JFrame {
 			
 			String euros = String.valueOf(Float.parseFloat(cp.Price) * cp.KWHRequested);
 			
-			label = new JLabel(euros);
+			label = new JLabel("Price:" + euros + " euros.");
 			label.setForeground(Color.WHITE);
 
 			label.setFont(fuenteNueva);

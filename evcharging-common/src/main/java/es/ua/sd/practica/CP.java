@@ -13,5 +13,14 @@ public class CP {
 		UID = uid; Price = price; Location = location; State = state;
 	}
 	
+	public String toString()
+	{
+		String cp;
+		
+		cp = UID + ";" + Price + ";" + Location;
+		
+		return cp;
+	}
+	
 	
 }

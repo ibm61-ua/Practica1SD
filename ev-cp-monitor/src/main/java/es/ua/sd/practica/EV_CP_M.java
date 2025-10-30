@@ -10,13 +10,25 @@ public class EV_CP_M {
 	public static int Port_Central;
 	public static String ID_CP;
 	public static MonitorGUI gui;
+	public static boolean alta = false;
+	public static String location;
+	public static String price;
 
 	public static void main(String[] args) {
 		if (args.length < 3) {
 			System.err.println("Introduce IP y puerto del EV_CP_E" + ", IP y puerto del EV_Central" + ", ID del CP");
 			return;
 		}
-		DeserializeARGS(args);
+		
+		if (args.length == 5)
+		{
+			DeserializeARGSAlta(args);
+		}
+		else
+		{
+			DeserializeARGS(args);
+		}
+		
 		SwingUtilities.invokeLater(() -> {
 			gui = new MonitorGUI(ID_CP);
 			Runnable Connection =  new ConnectionToEngine(ID_CP, IP_Engine, Port_Engine);
@@ -27,8 +39,7 @@ public class EV_CP_M {
 		
 	}
 	
-	
-	
+
 	public static void LostEngineConnection()
 	{
 		EVClient cpClient = new EVClient(IP_Central, Port_Central);
@@ -55,8 +66,15 @@ public class EV_CP_M {
 		EVClient cpClient = new EVClient(IP_Central, Port_Central);
         
         if (cpClient.startConnection()) {
-            
-            String statusRequest = "CONNECTION#" + ID_CP;
+            String statusRequest;
+        	if(alta)
+        	{
+        		statusRequest = "ALTA#"  + ID_CP + "#" + location + "#" + price;
+        	}
+        	else
+        	{
+        		statusRequest = "CONNECTION#" + ID_CP;
+        	}
             gui.NewMessage("[MONITOR] Enviando a CENTRAL: " + statusRequest);
             
             String response = cpClient.sendMessage(statusRequest); 
@@ -69,6 +87,25 @@ public class EV_CP_M {
             
             cpClient.stopConnection();
         }
+	}
+	
+	private static void DeserializeARGSAlta(String[] args) {
+		alta = true;
+		String[] splitter;
+
+		splitter = args[0].split(":");
+		IP_Engine = splitter[0];
+		Port_Engine = Integer.parseInt(splitter[1]);
+
+		splitter = args[1].split(":");
+		IP_Central = splitter[0];
+		Port_Central = Integer.parseInt(splitter[1]);
+
+		ID_CP = args[2];
+		
+		location = args[3];
+		price = args[4];
+		
 	}
 
 	private static void DeserializeARGS(String[] args) {

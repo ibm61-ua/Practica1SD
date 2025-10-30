@@ -35,4 +35,14 @@ public class EVClientHandler implements Runnable {
             }
         }
     }
+    
+    public void stop() {
+        try {
+            if (clientSocket != null && !clientSocket.isClosed()) {
+                clientSocket.close();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 }

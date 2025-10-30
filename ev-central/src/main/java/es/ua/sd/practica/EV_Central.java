@@ -22,6 +22,7 @@ public class EV_Central {
 	public static int port;
 	public static ArrayList<CP> cps = new ArrayList<>();
 	public static CentralMonitorGUI gui;
+	
   
 	public static void main(String[] args) {
 		if (args.length < 2) 
@@ -42,7 +43,6 @@ public class EV_Central {
         
         String topicRequest = CommonConstants.REQUEST; 
         String topicTelemetry = CommonConstants.TELEMETRY;
-        String topicControl = CommonConstants.CONTROL;
         
         String groupId = "ev"; 
         CentralLogic centralLogic = new CentralLogic();
@@ -58,6 +58,15 @@ public class EV_Central {
         
         Runnable checker = new HeartbeatChecker(centralLogic.getLastHeartbeat());
         new Thread(checker).start();
+        
+        new Thread(() -> {
+        	Producer r = new Producer(brokerIP, CommonConstants.CENTRAL_STATUS);
+            while (true) {
+                String keepAlive = "CENTRAL_STATUS#ALIVE";
+                r.sendMessage(keepAlive);
+                try { Thread.sleep(1000); } catch (InterruptedException ignored) {}
+            }
+        }).start();
     }
 	
 	

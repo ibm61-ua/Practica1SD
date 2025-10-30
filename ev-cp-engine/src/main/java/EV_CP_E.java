@@ -1,4 +1,5 @@
 import java.util.concurrent.TimeUnit;
+import java.util.Scanner;
 import java.util.UUID;
 
 
@@ -22,11 +23,35 @@ public class EV_CP_E {
 		broker = args[0];
 		port = Integer.parseInt(args[1]);
 		
-		Runnable EVServer = new EVServerSocket(port, EV_CP_E::handleMonitor);
-        new Thread(EVServer).start();
+		EVServerSocket EVServer = new EVServerSocket(port, EV_CP_E::handleMonitor);
+        Thread socket = new Thread(EVServer);
+        socket.start();
         
         Runnable consumerRequest = new KConsumer(broker, CommonConstants.REQUEST_CP, UUID.randomUUID().toString() , EV_CP_E::handleDriverRequest);
-        new Thread(consumerRequest).start();
+        Thread consumer = new Thread(consumerRequest);
+        consumer.start();
+
+        Scanner sc = new Scanner(System.in);
+
+        while (true) {
+            String input = sc.nextLine().trim().toLowerCase();
+            if (input.equals("k")) {
+                if (socket.isAlive()) {
+                    System.out.println("KO...");
+                    EVServer.stop();   
+                    socket.interrupt();   
+                    consumer.interrupt();
+                } else {
+                    System.out.println("VIVO...");
+                    EVServer = new EVServerSocket(port, EV_CP_E::handleMonitor);
+                    socket = new Thread(EVServer);
+                    socket.start();
+                    consumer = new Thread(consumerRequest);
+                    consumer.start();
+
+                }
+            }
+        }
 	}
 	
 	static void handleDriverRequest(String message)
@@ -48,7 +73,7 @@ public class EV_CP_E {
 				try {
 					TimeUnit.SECONDS.sleep(1);
 				} catch (InterruptedException e) {
-					e.printStackTrace();
+					break;
 				}
 				r.sendMessage("END#" + CP + "#" + message.split("#")[3]);
 				break;
@@ -59,7 +84,7 @@ public class EV_CP_E {
 			try {
 				TimeUnit.SECONDS.sleep(1);
 			} catch (InterruptedException e) {
-				e.printStackTrace();
+				break;
 			} 
 		}
 		

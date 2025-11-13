@@ -3,6 +3,7 @@ package es.ua.sd.practica;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.List;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.concurrent.ExecutorService;
@@ -12,10 +13,13 @@ import javax.swing.*;
 import java.awt.*;
 
 import es.ua.sd.practica.CommonConstants;
+import es.ua.sd.practica.DatabaseManager;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.util.Scanner;
+
+
 
 public class EV_Central {
 	public static String brokerIP;
@@ -80,16 +84,10 @@ public class EV_Central {
 	
 	public static void Serialize()
 	{
-		try (FileWriter fileWriter = new FileWriter("cpdatabase.txt", false); PrintWriter printWriter = new PrintWriter(fileWriter)) {
-
-				for (CP cp : cps)
-				{
-					String str = cp.UID + ";" + cp.Price + ";" + cp.Location + ";" + cp.State;
-		            printWriter.println(str);
-				}
-	        } catch (IOException e) {
-	            System.err.println("Error al escribir en el archivo: " + e.getMessage());
-	        }
+		for (CP cp : cps)
+		{
+			DatabaseManager.UpdateCPState(cp.UID, cp.State);
+		}
 	}
 	
 	protected static void refreshChargingPoints(CentralMonitorGUI gui) {
@@ -101,23 +99,13 @@ public class EV_Central {
 
 	public static void AddChargingPointFromDB()
 	{
-		try {
-            File archivo = new File("cpdatabase.txt");
-            Scanner s = new Scanner(archivo);
-
-            while (s.hasNextLine()) {
-                String linea = s.nextLine();
-                String[] splited = linea.split(";");
-                CP cp = new CP(splited[0], splited[1], splited[2], "DESCONECTADO");
-                cps.add(cp);
-            }
-
-            s.close();
-        } catch (FileNotFoundException e) {
-            System.out.println("No se encontró el archivo.");
-            e.printStackTrace();
-        }
-		
+		List<String> cpsStrings = DatabaseManager.GetAllCPS();
+		for(String s : cpsStrings)
+		{
+			String[] splitted = s.split("\\|");
+			CP cp = new CP(splitted[1], splitted[3], splitted[2], "DESCONECTADO");
+	        cps.add(cp);
+		}
 		
 	}
 	

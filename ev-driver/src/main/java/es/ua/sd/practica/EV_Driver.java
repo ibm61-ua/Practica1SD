@@ -35,7 +35,7 @@ public class EV_Driver {
 		Producer p = new Producer(IP_BROKER + ":" + Port_BROKER, CommonConstants.REQUEST);
 		SwingUtilities.invokeLater(() -> {
            gui = new DriverGUI(ID_Driver, p);
-	       gui.CreateButtons("cpdatabase.txt");
+	       gui.CreateButtons();
 	       gui.Log("");
 	   		
         });
@@ -92,7 +92,7 @@ public class EV_Driver {
 		if(message.split("#")[0].equals("END"))
 		{
 			System.out.println(message);
-			gui.Log("[" + message.split("#")[0] + "] CP: " + message.split("#")[1] + message.split("#")[3]);
+			gui.Log("[" + message.split("#")[0] + "] CP: " + message.split("#")[1] + " " +  message.split("#")[3]);
 			gui.Suministrando = false;
 			return;
 		}
@@ -125,12 +125,10 @@ public class EV_Driver {
 	            }
 	        }
 	        
-	        gui.CreateButtons("cpdatabase.txt");
+	        gui.CreateButtons();
 
 	    } catch (IOException e) {
-	        System.err.println("Error al actualizar la base de datos: " + e.getMessage());
 	    } catch (Exception e) {
-	        System.err.println("Error procesando mensaje RELOAD: " + e.getMessage());
 	    }
 	}
 

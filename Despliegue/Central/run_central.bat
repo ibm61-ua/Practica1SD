@@ -1,4 +1,5 @@
 @echo off
+title Central
 setlocal enabledelayedexpansion
 
 rem Leer toda la línea del archivo args.txt

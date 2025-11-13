@@ -16,6 +16,7 @@ public class CentralLogic extends EV_Central {
 	private final Map<String, Instant> lastHeartbeat = new ConcurrentHashMap<>();
 	public void handleRequest(String message) {
 		//Si el driver pide actualizar los CPS
+		// ejemplo: REQUEST#1|ALC|Alicante|0.35|DESCONECTADO#10.0#DV001
 		if(message.equals("RELOAD"))
 		{
 			handleReload();
@@ -25,7 +26,7 @@ public class CentralLogic extends EV_Central {
 		String kwh = null;
 		for(CP cp : cps)
 		{
-			if(cp.UID.equals(message.split("#")[1].split(";")[0]))
+			if(cp.UID.equals(message.split("#")[1].split("\\|")[1]))
 			{
 				if(cp.State.equals("DESCONECTADO") || cp.State.equals("AVERIADO") || cp.State.equals("PARADO") || cp.State.equals("CARGANDO") )
 				{
@@ -44,7 +45,7 @@ public class CentralLogic extends EV_Central {
 		LocalDateTime ahora = LocalDateTime.now();
 		DateTimeFormatter formato = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
 		String fechaHora = ahora.format(formato);
-		String m = fechaHora + "   "  + message.split("#")[1].split(";")[0] + "   "  + message.split("#")[2] + "   "  + message.split("#")[3];
+		String m = fechaHora + "   "  + message.split("#")[1].split("\\|")[1] + "   "  + message.split("#")[2] + "   "  + message.split("#")[3];
         gui.OnGoingPanel(m);
         
         Producer r = new Producer(super.brokerIP, CommonConstants.REQUEST_CP);

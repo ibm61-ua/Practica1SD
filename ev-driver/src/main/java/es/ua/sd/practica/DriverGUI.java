@@ -11,6 +11,7 @@ import java.awt.event.ActionListener;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Scanner;
 
 import javax.swing.BorderFactory;
@@ -143,27 +144,18 @@ public class DriverGUI extends JFrame {
         }
 	}
 	
-	public void CreateButtons(String path)
+	public void CreateButtons()
 	{
 		panelPrincipal.removeAll();
 		panelPrincipal.revalidate();
 	    panelPrincipal.repaint();
 	    
-		try {
-            File archivo = new File("cpdatabase.txt");
-            Scanner s = new Scanner(archivo);
-
-            while (s.hasNextLine()) {
-                String linea = s.nextLine();
-                JButton btnIniciarRecarga = new JButton("Iniciar Recarga en " + linea.split(";")[0]);
-                CreateButton(btnIniciarRecarga, linea);
-            }
-
-            s.close();
-        } catch (FileNotFoundException e) {
-            System.out.println("No se encontró el archivo.");
-            e.printStackTrace();
-        }
+	    List<String> cpsString = DatabaseManager.GetAllCPS();
+	    for (String s : cpsString)
+	    {
+	    	JButton btnIniciarRecarga = new JButton("Iniciar Recarga en " + s.split("\\|")[1]);
+	        CreateButton(btnIniciarRecarga, s);
+	    }
 		
 	}
 	

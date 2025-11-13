@@ -57,7 +57,8 @@ public class EV_CP_E {
 	static void handleDriverRequest(String message)
 	{
 		// ejemplo de request -> REQUEST#ALC001;0.35;Carrer de Sant Vicent;CONECTADO#10.0#DV001#0.35
-		if(!CP.equals(message.split("#")[1].split(";")[0])) return;
+		System.out.println(message);
+		if(!CP.equals(message.split("#")[1].split("\\|")[1])) return;
 		Producer r = new Producer(broker, CommonConstants.TELEMETRY);
 		r.sendMessage("ACKREQUEST#" + CP + "#" + message.split("#")[3]);
 		

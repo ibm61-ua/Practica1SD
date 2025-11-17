@@ -18,7 +18,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.util.Scanner;
-
+import static spark.Spark.*;
 
 
 public class EV_Central {
@@ -26,6 +26,7 @@ public class EV_Central {
 	public static int port;
 	public static ArrayList<CP> cps = new ArrayList<>();
 	public static CentralMonitorGUI gui;
+	private static final int API_PORT = 8081;
 	
   
 	public static void main(String[] args) {
@@ -35,6 +36,7 @@ public class EV_Central {
 			return;
 		}
 		AddChargingPointFromDB();
+		startApiServer();
         SwingUtilities.invokeLater(() -> {
             gui = new CentralMonitorGUI(cps);
             AddCPToGui(gui);
@@ -73,6 +75,66 @@ public class EV_Central {
         }).start();
     }
 	
+	private static void startApiServer() {
+        // Configura el puerto para el API_Central
+        port(API_PORT); 
+        
+        // --- 1. CONFIGURACIÓN CORS (CRUCIAL) ---
+        // Esto permite que el Front-End (en el puerto 8080) acceda a esta API (en 8081)
+        options("/*", (request, response) -> {
+            String accessControlRequestHeaders = request.headers("Access-Control-Request-Headers");
+            if (accessControlRequestHeaders != null) {
+                response.header("Access-Control-Allow-Headers", accessControlRequestHeaders);
+            }
+            String accessControlRequestMethod = request.headers("Access-Control-Request-Method");
+            if (accessControlRequestMethod != null) {
+                response.header("Access-Control-Allow-Methods", accessControlRequestMethod);
+            }
+            return "OK";
+        });
+        before((request, response) -> response.header("Access-Control-Allow-Origin", "*"));
+        // ----------------------------------------
+
+        // --- 2. IMPLEMENTACIÓN DEL ENDPOINT DE ESTADO ---
+        get("/api/status/all", (request, response) -> {
+            response.type("application/json"); // Establece el tipo de contenido a JSON
+            
+            // Llama a una función que obtenga el estado actual de la Central
+            String jsonStatus = getSystemStatusAsJson(); 
+            
+            System.out.println("HTTP: Petición /api/status/all respondida.");
+            return jsonStatus;
+        });
+
+        System.out.println("✅ CENTRAL API: Servidor REST iniciado en puerto " + API_PORT);
+    }
+	
+	
+	private static String getSystemStatusAsJson() {
+		String json = "[";
+	    int count = 0;
+	    
+	    for(CP cp : cps) {
+	        if (count > 0) {
+	            json += ","; 
+	        }
+
+	        // UID
+	        json += "{\"id\":\"" + cp.UID + "\",";
+	        // LOCATION
+	        json += "\"location\":\"" + cp.Location + "\",";
+	        // STATUS
+	        json += "\"status\":\"" + cp.State + "\",";
+	        // PRICE
+	        json += "\"price\":\"" + cp.Price + "\"}"; // Cierra el objeto aquí
+
+	        count++;
+	    }
+	    
+	    json += "]";
+	    
+	    return json;
+    }
 	
 	private static void AddCPToGui(CentralMonitorGUI gui) {
 		for(CP cp : cps)

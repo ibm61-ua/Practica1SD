@@ -73,14 +73,13 @@ public class EV_Central {
                 try { Thread.sleep(1000); } catch (InterruptedException ignored) {}
             }
         }).start();
+        
     }
 	
 	private static void startApiServer() {
         // Configura el puerto para el API_Central
         port(API_PORT); 
         
-        // --- 1. CONFIGURACIÓN CORS (CRUCIAL) ---
-        // Esto permite que el Front-End (en el puerto 8080) acceda a esta API (en 8081)
         options("/*", (request, response) -> {
             String accessControlRequestHeaders = request.headers("Access-Control-Request-Headers");
             if (accessControlRequestHeaders != null) {
@@ -93,9 +92,7 @@ public class EV_Central {
             return "OK";
         });
         before((request, response) -> response.header("Access-Control-Allow-Origin", "*"));
-        // ----------------------------------------
 
-        // --- 2. IMPLEMENTACIÓN DEL ENDPOINT DE ESTADO ---
         get("/api/status/all", (request, response) -> {
             response.type("application/json"); // Establece el tipo de contenido a JSON
             
@@ -125,8 +122,12 @@ public class EV_Central {
 	        json += "\"location\":\"" + cp.Location + "\",";
 	        // STATUS
 	        json += "\"status\":\"" + cp.State + "\",";
+	        // TEMPERATURE
+	        json += "\"temp\":\"" + cp.temperature + "\",";
+	        // ALERT
+	        json += "\"alert\":\"" + cp.alert + "\",";
 	        // PRICE
-	        json += "\"price\":\"" + cp.Price + "\"}"; // Cierra el objeto aquí
+	        json += "\"price\":\"" + cp.Price + "\"}"; 
 
 	        count++;
 	    }

@@ -55,12 +55,12 @@ public class DatabaseManager {
         }
     }
     
-    public static void DeleteCP(int id) {
-        String sql = "DELETE FROM CPS WHERE CPID=?";
+    public static void DeleteCP(String nombre) {
+        String sql = "DELETE FROM CPS WHERE nombre=?";
 
         try (Connection conn = connect();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setInt(1, id);
+            pstmt.setString(1, nombre);
             pstmt.executeUpdate();
         } catch (SQLException e) {
             e.printStackTrace();
@@ -88,4 +88,5 @@ public class DatabaseManager {
         }
         return estaciones;
     }
+   
 }

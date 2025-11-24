@@ -3,6 +3,7 @@ package es.ua.sd.practica;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -18,6 +19,8 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.util.Scanner;
+import java.util.Set;
+
 import static spark.Spark.*;
 
 
@@ -25,9 +28,10 @@ public class EV_Central {
 	public static String brokerIP;
 	public static int port;
 	public static ArrayList<CP> cps = new ArrayList<>();
+	public static Set<String> existingCPids = new HashSet<>();
 	public static CentralMonitorGUI gui;
 	private static final int API_PORT = 8081;
-	
+	private static DatabaseManager dbManager;
   
 	public static void main(String[] args) {
 		if (args.length < 2) 
@@ -35,17 +39,26 @@ public class EV_Central {
 			System.err.println("Pase por argumentos el puerto del socket y la IP y puerto del broker ");
 			return;
 		}
-		AddChargingPointFromDB();
+		gui = new CentralMonitorGUI(cps);
+		port = Integer.parseInt(args[0]);
+        brokerIP = args[1];
+        
+		String REMOTE_IP = brokerIP.split(":")[0]; 
+        String DB_NAME = "evcharging_db";
+        String DB_USER = "evcharging";
+        String DB_PASS = "practica2";
+
+        dbManager = new DatabaseManager(REMOTE_IP, DB_NAME, DB_USER, DB_PASS);
+        dbManager.createTable();
+        
 		startApiServer();
         SwingUtilities.invokeLater(() -> {
-            gui = new CentralMonitorGUI(cps);
             AddCPToGui(gui);
             OnGoingPanel(gui);
             MessagePanel(gui);
         });
         
-        port = Integer.parseInt(args[0	]);
-        brokerIP = args[1];
+        
         
         String topicRequest = CommonConstants.REQUEST; 
         String topicTelemetry = CommonConstants.TELEMETRY;
@@ -64,6 +77,14 @@ public class EV_Central {
         
         Runnable checker = new HeartbeatChecker(centralLogic.getLastHeartbeat());
         new Thread(checker).start();
+        
+        new Thread(() -> {
+        	Producer r = new Producer(brokerIP, CommonConstants.CENTRAL_STATUS);
+            while (true) {
+                AddChargingPointFromDB();
+                try { Thread.sleep(1000); } catch (InterruptedException ignored) {}
+            }
+        }).start();
         
         new Thread(() -> {
         	Producer r = new Producer(brokerIP, CommonConstants.CENTRAL_STATUS);
@@ -96,14 +117,12 @@ public class EV_Central {
         get("/api/status/all", (request, response) -> {
             response.type("application/json"); // Establece el tipo de contenido a JSON
             
-            // Llama a una función que obtenga el estado actual de la Central
             String jsonStatus = getSystemStatusAsJson(); 
             
             System.out.println("HTTP: Petición /api/status/all respondida.");
             return jsonStatus;
         });
 
-        System.out.println("✅ CENTRAL API: Servidor REST iniciado en puerto " + API_PORT);
     }
 	
 	
@@ -123,7 +142,7 @@ public class EV_Central {
 	        // STATUS
 	        json += "\"status\":\"" + cp.State + "\",";
 	        // TEMPERATURE
-	        json += "\"temp\":\"" + cp.temperature + "\",";
+	        json += "\"temmp\":\"" + cp.temperature + "\",";
 	        // ALERT
 	        json += "\"alert\":\"" + cp.alert + "\",";
 	        // PRICE
@@ -147,9 +166,10 @@ public class EV_Central {
 	
 	public static void Serialize()
 	{
+		
 		for (CP cp : cps)
 		{
-			DatabaseManager.UpdateCPState(cp.UID, cp.State);
+			dbManager.UpdateCPState(cp.UID, cp.State);
 		}
 	}
 	
@@ -160,16 +180,44 @@ public class EV_Central {
 	}
 
 
-	public static void AddChargingPointFromDB()
-	{
-		List<String> cpsStrings = DatabaseManager.GetAllCPS();
-		for(String s : cpsStrings)
-		{
-			String[] splitted = s.split("\\|");
-			CP cp = new CP(splitted[1], splitted[3], splitted[2], "DESCONECTADO");
-	        cps.add(cp);
-		}
-		
+	public static void AddChargingPointFromDB() { 
+	    
+	    Set<String> existingCPids = new HashSet<>(); // IDs de CPs que YA tenemos en memoria
+	    Set<String> dbCPids = new HashSet<>();       // IDs de CPs LEÍDOS de la BD (Fuente de verdad)
+	    
+	    
+	    List<String> cpsStrings = dbManager.GetAllCPS();
+	    
+	    for (String s : cpsStrings) {
+	        String[] splitted = s.split("\\|");
+	        String currentCPid = splitted[1];
+	        dbCPids.add(currentCPid); // Añadir ID de la BD al Set de BD
+	        if (!existingCPids.contains(currentCPid)) { 
+	            if (!isCPinMemory(currentCPid)) { // Función auxiliar para chequear la lista cps
+	                CP cp = new CP(splitted[1], splitted[3], splitted[2], "DESCONECTADO");
+	                cps.add(cp);
+	            }
+	        }
+	    }
+	    
+	    List<CP> cpsToRemove = new ArrayList<>();
+	    for (CP cp : cps) {
+	        if (!dbCPids.contains(cp.UID)) {
+	            cpsToRemove.add(cp);
+	        }
+	    }
+	    
+	    cps.removeAll(cpsToRemove);
+	    refreshChargingPoints(gui);
+	}
+
+	private static boolean isCPinMemory(String uid) {
+	    for (CP cp : cps) {
+	        if (cp.UID.equals(uid)) {
+	            return true;
+	        }
+	    }
+	    return false;
 	}
 	
 	public static void OnGoingPanel(CentralMonitorGUI gui)

@@ -12,4 +12,4 @@ ip_central=192.168.56.1
 port_central=8888
 
 #El nombre del cp, este debe existir en la base de datos, sino, hay que darlo de alta
-nombre_cp=ALC
+nombre_cp=BAR

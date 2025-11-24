@@ -10,39 +10,70 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class DatabaseManager {
-	private static final String URL = "jdbc:sqlite:evcharging.db";
-	
-	public static Connection connect() throws SQLException {
-        return DriverManager.getConnection(URL);
+    
+
+    private final String url;
+    private final String user;
+    private final String pass;
+    private static final int POSTGRES_PORT = 5432; 
+
+    public DatabaseManager(String ip, String dbName, String user, String pass) {
+
+        this.url = String.format("jdbc:postgresql://%s:%d/%s", ip, POSTGRES_PORT, dbName);
+        this.user = user;
+        this.pass = pass;
+    }
+    
+    public Connection connect() throws SQLException {
+    	Connection conn = DriverManager.getConnection(this.url, this.user, this.pass);
+        
+        if (!conn.getAutoCommit()) {
+            conn.setAutoCommit(true);
+        }
+        return conn;
     }
 
-    public static void createTable() {
-        String sql = " CREATE TABLE IF NOT EXISTS CPS (CPID INTEGER PRIMARY KEY, nombre TEXT NOT NULL, ciudad TEXT NOT NULL, precio INTEGER, estado TEXT)";
+    public void createTable() {
+ 
+        String sql = " CREATE TABLE IF NOT EXISTS CPS ("
+                   + " CPID SERIAL PRIMARY KEY,"
+                   + " nombre VARCHAR(255) NOT NULL,"
+                   + " ciudad VARCHAR(255) NOT NULL,"
+                   + " precio NUMERIC(10, 2),"
+                   + " estado VARCHAR(50),"
+                   + " UNIQUE(nombre)"
+                   + ")";
 
         try (Connection conn = connect();
              Statement stmt = conn.createStatement()) {
             stmt.execute(sql);
+            System.out.println("Tabla CPS verificada/creada.");
         } catch (SQLException e) {
+            System.err.println("Error al crear la tabla en PostgreSQL.");
             e.printStackTrace();
         }
     }
     
-    public static void InsertCP(String nombre, String ciudad, double d, String estado) {
+    public boolean InsertCP(String nombre, String ciudad, double precio, String estado) {
         String sql = "INSERT INTO CPS(nombre, ciudad, precio, estado) VALUES(?, ?, ?, ?)";
-
+        System.out.println("gsdgs");
         try (Connection conn = connect();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, nombre);
             pstmt.setString(2, ciudad);
-            pstmt.setDouble(3, d);
+            pstmt.setDouble(3, precio);
             pstmt.setString(4, estado);
             pstmt.executeUpdate();
+            System.out.println("CP insertado: " + nombre);
+            return true;
         } catch (SQLException e) {
+            System.err.println("Error al insertar CP.");
             e.printStackTrace();
+            return false;
         }
     }
     
-    public static void UpdateCPState(String nombre, String estado) {
+    public void UpdateCPState(String nombre, String estado) {
         String sql = "UPDATE CPS SET estado=? WHERE nombre=?";
 
         try (Connection conn = connect();
@@ -50,24 +81,30 @@ public class DatabaseManager {
             pstmt.setString(1, estado);
             pstmt.setString(2, nombre);
             pstmt.executeUpdate();
+            System.out.println("Estado de CP " + nombre + " actualizado a " + estado);
         } catch (SQLException e) {
+            System.err.println("Error al actualizar el estado del CP.");
             e.printStackTrace();
         }
     }
     
-    public static void DeleteCP(String nombre) {
+    public boolean DeleteCP(String nombre) {
         String sql = "DELETE FROM CPS WHERE nombre=?";
 
         try (Connection conn = connect();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, nombre);
             pstmt.executeUpdate();
+            System.out.println("CP " + nombre + " eliminado.");
+            return true;
         } catch (SQLException e) {
+            System.err.println("Error al eliminar CP.");
             e.printStackTrace();
+            return false;
         }
     }
     
-    public static List<String> GetAllCPS() {
+    public List<String> GetAllCPS() {
         List<String> estaciones = new ArrayList<>();
         String sql = "SELECT * FROM CPS";
 
@@ -76,7 +113,7 @@ public class DatabaseManager {
              ResultSet rs = stmt.executeQuery(sql)) {
 
             while (rs.next()) {
-                String linea = rs.getInt("CPID") + "|" +
+                String linea = rs.getInt("cpid") + "|" +
                                rs.getString("nombre") + "|" +
                                rs.getString("ciudad") + "|" +
                                rs.getDouble("precio") + "|" +
@@ -84,9 +121,10 @@ public class DatabaseManager {
                 estaciones.add(linea);
             }
         } catch (SQLException e) {
+            System.err.println("Error al obtener todos los CPs.");
             e.printStackTrace();
         }
         return estaciones;
     }
-   
+
 }

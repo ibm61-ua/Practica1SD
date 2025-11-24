@@ -1,0 +1,1 @@
+java -jar EV_Registry.jar

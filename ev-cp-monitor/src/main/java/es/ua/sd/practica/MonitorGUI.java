@@ -1,68 +1,389 @@
 package es.ua.sd.practica;
 
+import java.security.*;
+import java.security.cert.*;
+import java.security.cert.Certificate;
 import javax.swing.*;
-import javax.swing.border.TitledBorder;
-
 import java.awt.*;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.io.*;
+import java.math.BigInteger;
+import java.util.Date;
+
+import org.bouncycastle.asn1.x500.X500Name;
+import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
+import org.bouncycastle.cert.X509v3CertificateBuilder;
+import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
+import org.bouncycastle.operator.ContentSigner;
+import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
+import org.bouncycastle.pkcs.PKCS10CertificationRequest;
+import org.bouncycastle.pkcs.PKCS10CertificationRequestBuilder;
+import org.bouncycastle.util.io.pem.PemObject;
+import org.bouncycastle.util.io.pem.PemWriter;
+import org.bouncycastle.util.io.pem.PemReader;
+
+import com.google.gson.Gson;
+import okhttp3.*;
+
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.TrustManagerFactory;
+import javax.net.ssl.X509TrustManager;
+
+class RegistroPeticion { 
+    String id; String location; String price; String csrPem;
+    public RegistroPeticion(String id, String location, String price, String csrPem) {
+        this.id = id; this.location = location; this.price = price; this.csrPem = csrPem;
+    }
+    public RegistroPeticion(String id, String location, String price) {
+        this.id = id; this.location = location; this.price = price; this.csrPem = null;
+    }
+}
+
+class RegistroRespuesta {
+    public String status; public String id; public String certificate_pem; 
+    public String message; public RegistroRespuesta() {}
+}
 
 public class MonitorGUI extends JFrame {
-	private JPanel panelPrincipal;
-	private List<String> message = new CopyOnWriteArrayList<>();
+    private JPanel panelPrincipal;
+    private JPanel panelBotones;
+    private JTextArea panelLog;
+    
+    private static final String API_REGISTRY = "https://localhost:8088/api/registry/register"; 
+    private static final String API_BAJA = "https://localhost:8088/api/registry/delete";
+    
+    private JButton alta, baja, autentication, editarcp;
+    
+    private static String name;
+    private static String location; 
+    private static String price;
+    private static Gson GSON = new Gson();
+    
+    private static final String STORE_PASSWORD = "CP_Password_123"; 
+    private static final String KEY_ALIAS = "cp_key";
+    
+    private static final OkHttpClient client;
+    private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
 
-	public MonitorGUI(String name) {
-		super(name + " - Monitor");
+    static {
+        // Inicializamos el cliente base (sin certificado)
+        try {
+            client = createSecureClient(); 
+        } catch (Exception e) {
+            throw new RuntimeException("Fallo al inicializar SSL.", e);
+        }
+    }
+    
+    public static void main(String[] args) {
+        // FIX para localhost
+        System.setProperty("jsse.enableSNIExtension", "false");
+        new MonitorGUI("Estacion_1");
+    }
 
-		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-		setSize(1290, 720);
+    // --- CLIENTE BASE (Para Registro) ---
+    private static OkHttpClient createSecureClient() throws Exception {
+        final String TRUSTSTORE_FILE = "registry_ca.cer"; 
+        
+        CertificateFactory cf = CertificateFactory.getInstance("X.509"); // Usamos proveedor default
+        X509Certificate caCert;
+        try (FileInputStream fis = new FileInputStream(TRUSTSTORE_FILE)) {
+            caCert = (X509Certificate) cf.generateCertificate(fis);
+        }
 
-		panelPrincipal = new JPanel();
-		panelPrincipal.setLayout(new GridLayout(0, 2, 10, 10));
-		panelPrincipal.setPreferredSize(new Dimension(1290, 720));
+        KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
+        trustStore.load(null, null);
+        trustStore.setCertificateEntry("registry_ca_root", caCert); 
 
-		this.add(panelPrincipal);
-		setVisible(true);
-	}
-	
-	void NewMessage(String message)
-	{
-		Clear();
-		if (this.message.size() > 25)
-		{
-			this.message.remove(0);
-		}
-		this.message.add(message);
-		PrintMessage();
-	}
+        TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+        tmf.init(trustStore);
+        
+        // "TLS" genérico para máxima compatibilidad con EC
+        SSLContext sslContext = SSLContext.getInstance("TLS");
+        sslContext.init(null, tmf.getTrustManagers(), null);
 
-	void PrintMessage() {
-		JPanel MPanel = new JPanel();
-		MPanel.setLayout(new BoxLayout(MPanel, BoxLayout.Y_AXIS));
-		MPanel.setBorder(BorderFactory.createTitledBorder("Status"));
-		MPanel.setBackground(Color.WHITE);
-		
-		for(String message : this.message)
-		{
-			JLabel label = new JLabel(message);
-			label.setForeground(Color.BLACK);
+        return new OkHttpClient.Builder()
+            .sslSocketFactory(sslContext.getSocketFactory(), (X509TrustManager) tmf.getTrustManagers()[0])
+            .hostnameVerifier((hostname, session) -> true)
+            .build();
+    }
 
-			Font fuenteActual = label.getFont();
-			Font fuenteNueva = new Font(fuenteActual.getName(), fuenteActual.getStyle(), 16);
-			label.setFont(fuenteNueva);
+    public MonitorGUI(String name) {
+        super(name + " - Monitor");
+        this.name = name;
+        
+        // BouncyCastle SOLO para generar claves/CSR, no para la conexión HTTP
+        Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider());
+        
+        this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        this.setSize(1280, 720);
 
-			MPanel.add(label);
-		}
-		
-		panelPrincipal.add(MPanel);
-		this.revalidate();
-		this.repaint();
-	}
-	
-	void Clear()
-	{
-		panelPrincipal.removeAll();
-	}
+        panelPrincipal = new JPanel(new BorderLayout());
+        initButtonPanel();
+        
+        panelLog = new JTextArea("Log del Monitor: " + name + "\n", 10, 50);
+        panelLog.setFont(new Font("Monospaced", Font.PLAIN, 20));
+        panelLog.setEditable(false); 
+        panelPrincipal.add(new JScrollPane(panelLog), BorderLayout.CENTER);
+        
+        ActionListeners();
+        this.add(panelPrincipal);
+        setVisible(true);
+    }
+    
+    private void initButtonPanel() {
+        panelBotones = new JPanel();
+        editarcp = new JButton("Editar CP"); editarcp.setPreferredSize(new Dimension(300, 150)); 
+        alta = new JButton("Dar de Alta"); alta.setPreferredSize(new Dimension(300, 150)); 
+        baja = new JButton("Dar de Baja"); baja.setPreferredSize(new Dimension(300, 150));
+        autentication = new JButton("Autenticar"); autentication.setPreferredSize(new Dimension(300, 150)); 
+
+        panelBotones.add(editarcp); panelBotones.add(alta);
+        panelBotones.add(baja); panelBotones.add(autentication);
+        panelPrincipal.add(panelBotones, BorderLayout.NORTH);
+    }
+    
+    private void repaintButtonPanel() {
+        panelBotones.removeAll();
+        panelBotones.add(editarcp); panelBotones.add(alta);
+        panelBotones.add(baja); panelBotones.add(autentication);
+        panelBotones.revalidate(); panelBotones.repaint();
+    }
+
+    void ActionListeners() {
+        editarcp.addActionListener(e -> {
+            panelBotones.removeAll();
+            panelBotones.add(crearPanelEdicion(name, location, price)); 
+            panelBotones.revalidate(); panelBotones.repaint();
+        });
+        
+        alta.addActionListener(e -> {
+            if (location == null || price == null) {
+                NewMessage("ERROR: Configura Location y Price primero.");
+                return;
+            }
+            new Thread(() -> {
+                try { enviarPeticionRegistro(); } 
+                catch (Exception ex) { NewMessage("ERROR: " + ex.getMessage()); ex.printStackTrace(); }
+            }).start();
+        });
+        
+        baja.addActionListener(e -> {
+            new Thread(this::enviarPeticionBaja).start();
+        });
+    }
+    
+    private JPanel crearPanelEdicion(String nombreCP, String loc, String pr) {
+        JPanel p = new JPanel(new GridLayout(4, 2, 10, 10)); 
+        JTextField locField = new JTextField(loc != null ? loc : "", 15);
+        JTextField prField = new JTextField(pr != null ? pr : "", 15);
+        JButton ok = new JButton("Aceptar");
+
+        ok.addActionListener(e -> {
+            location = locField.getText(); price = prField.getText();
+            if(location.isBlank() || price.isBlank()) { NewMessage("Rellena los campos."); return; }
+            repaintButtonPanel();
+            NewMessage("Configurado: Loc=" + location + ", Price=" + price);
+        });
+
+        p.add(new JLabel("CP: " + nombreCP)); p.add(new JLabel("")); 
+        p.add(new JLabel("Location:")); p.add(locField);
+        p.add(new JLabel("Price:")); p.add(prField);
+        p.add(new JLabel("")); p.add(ok); 
+        return p;
+    }
+    
+    void NewMessage(String message) {
+        SwingUtilities.invokeLater(() -> {
+            panelLog.append(message + "\n");
+            panelLog.setCaretPosition(panelLog.getDocument().getLength());
+        });
+    }
+    
+    // --- ALTA ---
+    public void enviarPeticionRegistro() throws Exception {
+        // Generamos claves EC (Curva Elíptica)
+        KeyPair kp = generarParDeClaves(); 
+        String csrPem = crearCSR(kp, name, location); 
+        
+        guardarClavePrivadaSegura(kp.getPrivate(), kp.getPublic(), name); 
+        
+        RegistroPeticion datos = new RegistroPeticion(name, location, price, csrPem);
+        RequestBody body = RequestBody.create(GSON.toJson(datos), JSON);
+        Request request = new Request.Builder().url(API_REGISTRY).put(body).build();
+
+        try (Response response = client.newCall(request).execute()) {
+            String jsonResponse = response.body().string(); 
+            if (response.code() == 201) {
+                RegistroRespuesta resp = GSON.fromJson(jsonResponse, RegistroRespuesta.class);
+                X509Certificate certReal = decodificarPEM_a_Certificado(resp.certificate_pem);
+                actualizarKeystoreConCadena(certReal); 
+                NewMessage("✅ Registro exitoso con EC.");
+            } else {
+                 NewMessage("❌ Error registro: " + response.code() + " " + jsonResponse);
+            }
+        }
+    }
+
+    private void actualizarKeystoreConCadena(X509Certificate certReal) throws Exception {
+        KeyStore ks = cargarKeystoreExistente(name); 
+        PrivateKey pk = (PrivateKey) ks.getKey(KEY_ALIAS, STORE_PASSWORD.toCharArray());
+        
+        KeyStore caTrust = createTrustStoreWithCARoot();
+        X509Certificate caCert = (X509Certificate) caTrust.getCertificate("registry_ca_root");
+
+        Certificate[] chain = new Certificate[]{ certReal, caCert };
+        ks.setKeyEntry(KEY_ALIAS, pk, STORE_PASSWORD.toCharArray(), chain);
+        guardarKeystoreModificado(ks, name);
+    }
+    
+    // --- BAJA (mTLS) ---
+    public void enviarPeticionBaja() {
+        RegistroPeticion datos = new RegistroPeticion(name, location, price);
+        RequestBody body = RequestBody.create(GSON.toJson(datos), JSON);
+        
+        try {
+            OkHttpClient mTLSClient = createMtlsClient(name, STORE_PASSWORD);
+            Request request = new Request.Builder().url(API_BAJA).delete(body).build();
+
+            try (Response response = mTLSClient.newCall(request).execute()) {
+                if (response.code() == 200) {
+                    NewMessage("✅ Baja exitosa.");
+                    eliminarKeystoreLocal(); 
+                } else {
+                     NewMessage("❌ Error Baja: " + response.code() + " " + response.body().string());
+                }
+            } 
+        } catch (Exception e) {
+            NewMessage("❌ Error: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
+    private OkHttpClient createMtlsClient(String cpName, String password) throws Exception {
+        final String TRUSTSTORE_FILE = "registry_ca.cer"; 
+        CertificateFactory cf = CertificateFactory.getInstance("X.509");
+        X509Certificate caCert;
+        try (FileInputStream fis = new FileInputStream(TRUSTSTORE_FILE)) {
+            caCert = (X509Certificate) cf.generateCertificate(fis);
+        }
+
+        KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
+        trustStore.load(null, null);
+        trustStore.setCertificateEntry("registry_ca_root", caCert);
+
+        TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+        tmf.init(trustStore);
+        
+        KeyStore clientKs = cargarKeystoreExistente(cpName);
+        KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+        kmf.init(clientKs, password.toCharArray()); 
+        
+        SSLContext sslContext = SSLContext.getInstance("TLS"); 
+        sslContext.init(kmf.getKeyManagers(), tmf.getTrustManagers(), null);
+
+        return client.newBuilder()
+            .sslSocketFactory(sslContext.getSocketFactory(), (X509TrustManager)tmf.getTrustManagers()[0])
+            .hostnameVerifier((hostname, session) -> true)
+            .build();
+    }
+
+    // --- UTILS DE CRIPTOGRAFÍA (MODIFICADO PARA EC) ---
+
+    public KeyPair generarParDeClaves() throws Exception {
+        // CAMBIO: Usamos EC en lugar de RSA
+        KeyPairGenerator keyGen = KeyPairGenerator.getInstance("EC", "BC");
+        keyGen.initialize(256); // 256 bits es estándar para EC
+        return keyGen.generateKeyPair();
+    }
+    
+    public String crearCSR(KeyPair kp, String id, String loc) throws Exception {
+        PublicKey pk = kp.getPublic();
+        SubjectPublicKeyInfo pkInfo = SubjectPublicKeyInfo.getInstance(pk.getEncoded());
+        X500Name subject = new X500Name("CN=" + id + ",L=" + loc + ",O=EVChargingCompany");
+        
+        // CAMBIO: Algoritmo de firma para EC
+        ContentSigner signer = new JcaContentSignerBuilder("SHA256withECDSA")
+            .setProvider("BC").build(kp.getPrivate());
+        
+        PKCS10CertificationRequestBuilder builder = new PKCS10CertificationRequestBuilder(subject, pkInfo); 
+        return codificarCSRA_PEM(builder.build(signer)); 
+    }
+    
+    // ... (codificarCSRA_PEM, guardarClavePrivadaSegura, cargarKeystore igual que antes)
+    
+    public String codificarCSRA_PEM(PKCS10CertificationRequest csr) throws Exception {
+        StringWriter sw = new StringWriter();
+        try (PemWriter pw = new PemWriter(sw)) { pw.writeObject(new PemObject("CERTIFICATE REQUEST", csr.getEncoded())); }
+        return sw.toString();
+    }
+
+    public void guardarClavePrivadaSegura(PrivateKey pk, PublicKey pub, String name) throws Exception {
+        Certificate[] dummy = crearCertificadoDummy(pk, pub, name); 
+        KeyStore ks = KeyStore.getInstance("PKCS12");
+        ks.load(null, null); 
+        ks.setKeyEntry(KEY_ALIAS, pk, STORE_PASSWORD.toCharArray(), dummy);
+        try (FileOutputStream fos = new FileOutputStream(name + "_cp.p12")) {
+            ks.store(fos, STORE_PASSWORD.toCharArray());
+        }
+    }
+
+    private Certificate[] crearCertificadoDummy(PrivateKey pk, PublicKey pub, String name) throws Exception {
+        SubjectPublicKeyInfo pkInfo = SubjectPublicKeyInfo.getInstance(pub.getEncoded());
+        X500Name subject = new X500Name("CN=" + name); 
+        
+        // CAMBIO: Algoritmo EC
+        ContentSigner signer = new JcaContentSignerBuilder("SHA256withECDSA")
+            .setProvider("BC").build(pk); 
+
+        X509v3CertificateBuilder builder = new X509v3CertificateBuilder(
+            subject, BigInteger.valueOf(System.currentTimeMillis()), 
+            new Date(), new Date(System.currentTimeMillis() + 86400000L), subject, pkInfo);
+
+        X509Certificate cert = new JcaX509CertificateConverter().setProvider("BC").getCertificate(builder.build(signer));
+        return new Certificate[] { cert };
+    }
+
+    // (decodificarPEM, createTrustStore, eliminarKeystore, etc. igual que antes)
+    private static KeyStore createTrustStoreWithCARoot() throws Exception {
+        final String TRUSTSTORE_FILE = "registry_ca.cer"; 
+        CertificateFactory cf = CertificateFactory.getInstance("X.509");
+        try (FileInputStream fis = new FileInputStream(TRUSTSTORE_FILE)) {
+            KeyStore ks = KeyStore.getInstance(KeyStore.getDefaultType());
+            ks.load(null, null);
+            ks.setCertificateEntry("registry_ca_root", cf.generateCertificate(fis));
+            return ks;
+        }
+    }
+    
+    public KeyStore cargarKeystoreExistente(String name) throws Exception {
+        try (FileInputStream fis = new FileInputStream(name + "_cp.p12")) {
+            KeyStore ks = KeyStore.getInstance("PKCS12");
+            ks.load(fis, STORE_PASSWORD.toCharArray());
+            return ks;
+        }
+    }
+    
+    public void guardarKeystoreModificado(KeyStore ks, String name) throws Exception {
+        try (FileOutputStream fos = new FileOutputStream(name + "_cp.p12")) {
+            ks.store(fos, STORE_PASSWORD.toCharArray());
+        }
+    }
+    
+    public X509Certificate decodificarPEM_a_Certificado(String pem) throws Exception {
+        String clean = pem.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\\", "").trim();
+        int start = clean.indexOf("-----BEGIN CERTIFICATE-----");
+        if (start == -1) return (X509Certificate) CertificateFactory.getInstance("X.509").generateCertificate(new ByteArrayInputStream(pem.getBytes()));
+        String block = clean.substring(start, clean.indexOf("-----END CERTIFICATE-----") + "-----END CERTIFICATE-----".length());
+        return (X509Certificate) CertificateFactory.getInstance("X.509").generateCertificate(new ByteArrayInputStream(new PemReader(new StringReader(block)).readPemObject().getContent()));
+    }
+    
+    private void eliminarKeystoreLocal() {
+        File ksFile = new File(name + "_cp.p12");
+        if (ksFile.exists()) {
+            ksFile.delete();
+            NewMessage("[MONITOR] Archivo .p12 local eliminado.");
+        }
+    }
 }
+

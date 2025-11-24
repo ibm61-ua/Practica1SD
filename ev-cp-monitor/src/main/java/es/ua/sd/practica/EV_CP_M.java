@@ -19,15 +19,8 @@ public class EV_CP_M {
 			System.err.println("Introduce IP y puerto del EV_CP_E" + ", IP y puerto del EV_Central" + ", ID del CP");
 			return;
 		}
-		
-		if (args.length == 5)
-		{
-			DeserializeARGSAlta(args);
-		}
-		else
-		{
-			DeserializeARGS(args);
-		}
+		System.setProperty("javax.net.debug", "ssl:handshake:verbose");
+		DeserializeARGS(args);
 		
 		SwingUtilities.invokeLater(() -> {
 			gui = new MonitorGUI(ID_CP);
@@ -89,24 +82,6 @@ public class EV_CP_M {
         }
 	}
 	
-	private static void DeserializeARGSAlta(String[] args) {
-		alta = true;
-		String[] splitter;
-
-		splitter = args[0].split(":");
-		IP_Engine = splitter[0];
-		Port_Engine = Integer.parseInt(splitter[1]);
-
-		splitter = args[1].split(":");
-		IP_Central = splitter[0];
-		Port_Central = Integer.parseInt(splitter[1]);
-
-		ID_CP = args[2];
-		
-		location = args[3];
-		price = args[4];
-		
-	}
 
 	private static void DeserializeARGS(String[] args) {
 		String[] splitter;

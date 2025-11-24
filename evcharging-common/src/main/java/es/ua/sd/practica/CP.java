@@ -15,6 +15,7 @@ public class CP {
 	public boolean alert = false;
 	public float KWHRequested = 0.f;
 	public String driver = null;
+	public boolean autenticado = false;
 	
 	public CP(String uid, String price, String location, String state)
 	{

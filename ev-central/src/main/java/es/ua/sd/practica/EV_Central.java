@@ -30,25 +30,29 @@ public class EV_Central {
 	public static ArrayList<CP> cps = new ArrayList<>();
 	public static Set<String> existingCPids = new HashSet<>();
 	public static CentralMonitorGUI gui;
-	private static final int API_PORT = 8081;
+	public static int API_PORT_EVW;
+	public static int API_PORT_AUTHENTICATOR;
+	public static String IP_DATABASE;
 	private static DatabaseManager dbManager;
   
 	public static void main(String[] args) {
-		if (args.length < 2) 
+		if (args.length < 5) 
 		{
-			System.err.println("Pase por argumentos el puerto del socket y la IP y puerto del broker ");
+			System.err.println("Pase por argumentos el puerto del socket, la IP y puerto del broker, la IP de la base de datos, el puerto de la API de EV_w y el puerto de la API de autenticacion ");
 			return;
 		}
 		gui = new CentralMonitorGUI(cps);
 		port = Integer.parseInt(args[0]);
         brokerIP = args[1];
+        API_PORT_AUTHENTICATOR = Integer.parseInt(args[4]);
+        API_PORT_EVW = Integer.parseInt(args[3]);
+        IP_DATABASE = args[2];
         
-		String REMOTE_IP = brokerIP.split(":")[0]; 
         String DB_NAME = "evcharging_db";
         String DB_USER = "evcharging";
         String DB_PASS = "practica2";
 
-        dbManager = new DatabaseManager(REMOTE_IP, DB_NAME, DB_USER, DB_PASS);
+        dbManager = new DatabaseManager(IP_DATABASE, DB_NAME, DB_USER, DB_PASS);
         dbManager.createTable();
         
 		startApiServer();
@@ -57,8 +61,6 @@ public class EV_Central {
             OnGoingPanel(gui);
             MessagePanel(gui);
         });
-        
-        
         
         String topicRequest = CommonConstants.REQUEST; 
         String topicTelemetry = CommonConstants.TELEMETRY;
@@ -77,6 +79,9 @@ public class EV_Central {
         
         Runnable checker = new HeartbeatChecker(centralLogic.getLastHeartbeat());
         new Thread(checker).start();
+        
+        Runnable CentralAuthenticator = new CentralCPAuthenticator();
+        new Thread(CentralAuthenticator).start();
         
         new Thread(() -> {
         	Producer r = new Producer(brokerIP, CommonConstants.CENTRAL_STATUS);
@@ -99,7 +104,7 @@ public class EV_Central {
 	
 	private static void startApiServer() {
         // Configura el puerto para el API_Central
-        port(API_PORT); 
+        port(API_PORT_EVW); 
         
         options("/*", (request, response) -> {
             String accessControlRequestHeaders = request.headers("Access-Control-Request-Headers");
@@ -166,7 +171,6 @@ public class EV_Central {
 	
 	public static void Serialize()
 	{
-		
 		for (CP cp : cps)
 		{
 			dbManager.UpdateCPState(cp.UID, cp.State);

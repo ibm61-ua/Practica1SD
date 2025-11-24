@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:latest
+    container_name: ev_postgres
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: evcharging    
+      POSTGRES_PASSWORD: practica2   
+      POSTGRES_DB: evcharging_db   
+    volumes:
+      - ev_data:/var/lib/postgresql/data
+    command: ["postgres", "-c", "listen_addresses=*"]
+
+volumes:
+  ev_data:

@@ -1,1 +1,5 @@
-8888 192.168.1.102:9092
+port_cps=8888
+broker_kafka=192.168.1.102:9092
+database_ip=192.168.1.102
+api_port_ev_Weather=8081
+api_port_authenticator=8082

@@ -28,11 +28,9 @@ public class CertificateSigner {
         PemReader reader = new PemReader(new StringReader(csrPem));
         PKCS10CertificationRequest csr = new PKCS10CertificationRequest(reader.readPemObject().getContent());
         
-        // Obtenemos la clave pública del CSR (que ahora es EC)
         PublicKey cpKey = new JcaPKCS10CertificationRequest(csr).setProvider("BC").getPublicKey();
         SubjectPublicKeyInfo keyInfo = SubjectPublicKeyInfo.getInstance(cpKey.getEncoded());
 
-        // CAMBIO: Algoritmo de firma EC
         ContentSigner signer = new JcaContentSignerBuilder("SHA256withECDSA")
             .setProvider("BC").build(caKey);
 

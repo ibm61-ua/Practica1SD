@@ -50,8 +50,9 @@ public class MonitorGUI extends JFrame {
     private JPanel panelBotones;
     private JTextArea panelLog;
     
-    private static final String API_REGISTRY = "https://localhost:8088/api/registry/register"; 
-    private static final String API_BAJA = "https://localhost:8088/api/registry/delete";
+    private static String API_REGISTRY; 
+    private static String API_BAJA;
+    private static String API_AUTH;
     
     private JButton alta, baja, autentication, editarcp;
     
@@ -67,21 +68,13 @@ public class MonitorGUI extends JFrame {
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
 
     static {
-        // Inicializamos el cliente base (sin certificado)
         try {
             client = createSecureClient(); 
         } catch (Exception e) {
             throw new RuntimeException("Fallo al inicializar SSL.", e);
         }
     }
-    
-    public static void main(String[] args) {
-        // FIX para localhost
-        System.setProperty("jsse.enableSNIExtension", "false");
-        new MonitorGUI("Estacion_1");
-    }
 
-    // --- CLIENTE BASE (Para Registro) ---
     private static OkHttpClient createSecureClient() throws Exception {
         final String TRUSTSTORE_FILE = "registry_ca.cer"; 
         
@@ -98,7 +91,6 @@ public class MonitorGUI extends JFrame {
         TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
         tmf.init(trustStore);
         
-        // "TLS" genérico para máxima compatibilidad con EC
         SSLContext sslContext = SSLContext.getInstance("TLS");
         sslContext.init(null, tmf.getTrustManagers(), null);
 
@@ -108,11 +100,14 @@ public class MonitorGUI extends JFrame {
             .build();
     }
 
-    public MonitorGUI(String name) {
+    public MonitorGUI(String name, String EV_registry, String Central) {
         super(name + " - Monitor");
         this.name = name;
         
-        // BouncyCastle SOLO para generar claves/CSR, no para la conexión HTTP
+        API_REGISTRY = "https://" + EV_registry + "/api/registry/register";
+        API_BAJA = "https://" + EV_registry  + "/api/registry/delete";
+        API_AUTH = "https://" + Central  + "/api/auth";
+        
         Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider());
         
         this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -136,7 +131,7 @@ public class MonitorGUI extends JFrame {
         editarcp = new JButton("Editar CP"); editarcp.setPreferredSize(new Dimension(300, 150)); 
         alta = new JButton("Dar de Alta"); alta.setPreferredSize(new Dimension(300, 150)); 
         baja = new JButton("Dar de Baja"); baja.setPreferredSize(new Dimension(300, 150));
-        autentication = new JButton("Autenticar"); autentication.setPreferredSize(new Dimension(300, 150)); 
+        autentication = new JButton("Autenticar en la Central"); autentication.setPreferredSize(new Dimension(300, 150)); 
 
         panelBotones.add(editarcp); panelBotones.add(alta);
         panelBotones.add(baja); panelBotones.add(autentication);
@@ -171,6 +166,10 @@ public class MonitorGUI extends JFrame {
         baja.addActionListener(e -> {
             new Thread(this::enviarPeticionBaja).start();
         });
+        
+        autentication.addActionListener(e -> {
+            new Thread(this::solicitarAuth).start();
+        });
     }
     
     private JPanel crearPanelEdicion(String nombreCP, String loc, String pr) {
@@ -200,9 +199,7 @@ public class MonitorGUI extends JFrame {
         });
     }
     
-    // --- ALTA ---
     public void enviarPeticionRegistro() throws Exception {
-        // Generamos claves EC (Curva Elíptica)
         KeyPair kp = generarParDeClaves(); 
         String csrPem = crearCSR(kp, name, location); 
         
@@ -218,9 +215,9 @@ public class MonitorGUI extends JFrame {
                 RegistroRespuesta resp = GSON.fromJson(jsonResponse, RegistroRespuesta.class);
                 X509Certificate certReal = decodificarPEM_a_Certificado(resp.certificate_pem);
                 actualizarKeystoreConCadena(certReal); 
-                NewMessage("✅ Registro exitoso con EC.");
+                NewMessage("Alta exitosa en la base de datos.");
             } else {
-                 NewMessage("❌ Error registro: " + response.code() + " " + jsonResponse);
+                 NewMessage("Error registro: " + response.code() + " " + jsonResponse);
             }
         }
     }
@@ -237,7 +234,6 @@ public class MonitorGUI extends JFrame {
         guardarKeystoreModificado(ks, name);
     }
     
-    // --- BAJA (mTLS) ---
     public void enviarPeticionBaja() {
         RegistroPeticion datos = new RegistroPeticion(name, location, price);
         RequestBody body = RequestBody.create(GSON.toJson(datos), JSON);
@@ -248,14 +244,35 @@ public class MonitorGUI extends JFrame {
 
             try (Response response = mTLSClient.newCall(request).execute()) {
                 if (response.code() == 200) {
-                    NewMessage("✅ Baja exitosa.");
+                    NewMessage("Baja exitosa.");
                     eliminarKeystoreLocal(); 
                 } else {
-                     NewMessage("❌ Error Baja: " + response.code() + " " + response.body().string());
+                     NewMessage("Error Baja: " + response.code() + " " + response.body().string());
                 }
             } 
         } catch (Exception e) {
-            NewMessage("❌ Error: " + e.getMessage());
+            NewMessage("Error: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
+    public void solicitarAuth() {
+        RegistroPeticion datos = new RegistroPeticion(name, location, price);
+        RequestBody body = RequestBody.create(GSON.toJson(datos), JSON);
+        
+        try {
+            OkHttpClient mTLSClient = createMtlsClient(name, STORE_PASSWORD);
+            Request request = new Request.Builder().url(API_AUTH).put(body).build();
+
+            try (Response response = mTLSClient.newCall(request).execute()) {
+                if (response.code() == 200) {
+                    NewMessage("Autenticación exitosa.");
+                } else {
+                    NewMessage("Error Autenticación: " + response.code() + " " + response.body().string());
+                }
+            } 
+        } catch (Exception e) {
+            NewMessage("Error: " + e.getMessage());
             e.printStackTrace();
         }
     }
@@ -288,12 +305,10 @@ public class MonitorGUI extends JFrame {
             .build();
     }
 
-    // --- UTILS DE CRIPTOGRAFÍA (MODIFICADO PARA EC) ---
 
     public KeyPair generarParDeClaves() throws Exception {
-        // CAMBIO: Usamos EC en lugar de RSA
         KeyPairGenerator keyGen = KeyPairGenerator.getInstance("EC", "BC");
-        keyGen.initialize(256); // 256 bits es estándar para EC
+        keyGen.initialize(256); 
         return keyGen.generateKeyPair();
     }
     
@@ -302,15 +317,11 @@ public class MonitorGUI extends JFrame {
         SubjectPublicKeyInfo pkInfo = SubjectPublicKeyInfo.getInstance(pk.getEncoded());
         X500Name subject = new X500Name("CN=" + id + ",L=" + loc + ",O=EVChargingCompany");
         
-        // CAMBIO: Algoritmo de firma para EC
-        ContentSigner signer = new JcaContentSignerBuilder("SHA256withECDSA")
-            .setProvider("BC").build(kp.getPrivate());
+        ContentSigner signer = new JcaContentSignerBuilder("SHA256withECDSA").setProvider("BC").build(kp.getPrivate());
         
         PKCS10CertificationRequestBuilder builder = new PKCS10CertificationRequestBuilder(subject, pkInfo); 
         return codificarCSRA_PEM(builder.build(signer)); 
     }
-    
-    // ... (codificarCSRA_PEM, guardarClavePrivadaSegura, cargarKeystore igual que antes)
     
     public String codificarCSRA_PEM(PKCS10CertificationRequest csr) throws Exception {
         StringWriter sw = new StringWriter();
@@ -332,9 +343,7 @@ public class MonitorGUI extends JFrame {
         SubjectPublicKeyInfo pkInfo = SubjectPublicKeyInfo.getInstance(pub.getEncoded());
         X500Name subject = new X500Name("CN=" + name); 
         
-        // CAMBIO: Algoritmo EC
-        ContentSigner signer = new JcaContentSignerBuilder("SHA256withECDSA")
-            .setProvider("BC").build(pk); 
+        ContentSigner signer = new JcaContentSignerBuilder("SHA256withECDSA").setProvider("BC").build(pk); 
 
         X509v3CertificateBuilder builder = new X509v3CertificateBuilder(
             subject, BigInteger.valueOf(System.currentTimeMillis()), 
@@ -344,7 +353,6 @@ public class MonitorGUI extends JFrame {
         return new Certificate[] { cert };
     }
 
-    // (decodificarPEM, createTrustStore, eliminarKeystore, etc. igual que antes)
     private static KeyStore createTrustStoreWithCARoot() throws Exception {
         final String TRUSTSTORE_FILE = "registry_ca.cer"; 
         CertificateFactory cf = CertificateFactory.getInstance("X.509");

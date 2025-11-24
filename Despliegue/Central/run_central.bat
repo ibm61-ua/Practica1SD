@@ -2,10 +2,14 @@
 title Central
 setlocal enabledelayedexpansion
 
-rem Leer toda la línea del archivo args.txt
-set /p args=<args.txt
+for /f "tokens=1,2 delims==" %%a in (args.txt) do (
+    if not "%%a"=="" (
+        if not "%%a"=="#" (
+            set %%a=%%b
+        )
+    )
+)
 
-echo Ejecutando con argumentos: %args%
-java -jar EV_Central.jar %args%
+java -jar EV_Central.jar %port_cps% %broker_kafka% %database_ip% %api_port_ev_Weather% %api_port_authenticator%
 
-pause
+

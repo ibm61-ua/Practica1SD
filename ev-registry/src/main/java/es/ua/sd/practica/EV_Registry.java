@@ -25,33 +25,34 @@ import java.io.FileInputStream;
 
 import static spark.Spark.*;
 
-// --- CLASES AUXILIARES ---
 class RegistroPeticion { 
     String id; String location; String price; String csrPem; 
 }
 
 public class EV_Registry {
 
-    private static final int API_PORT = 8088;
+    private static int API_PORT;
+    private static String databaseIP;
     private static final Gson GSON = new Gson();
     private static final String KEYSTORE_FILE = "ca_registry.p12";
     private static final String KEYSTORE_PASS = "Practica2";
 
     public static void main(String[] args) {
+    	
+    	if (args.length < 2) return;
+    	
+    	API_PORT = Integer.parseInt(args[0]);
+    	databaseIP = args[1];
+    	
         Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider());
         Spark.stop();
 
-        // -----------------------------------------------------------
-        // PASO 1: DIAGNÓSTICO FORENSE DE LA CARGA DEL KEYSTORE
-        // -----------------------------------------------------------
-        System.out.println("\n=== INICIANDO DIAGNÓSTICO DE SEGURIDAD ===");
         KeyStore ksCargado = null;
         try {
             File f = new File(KEYSTORE_FILE);
-            System.out.println("1. Buscando archivo: " + f.getAbsolutePath());
             
             if (!f.exists()) {
-                System.err.println("❌ ERROR CRÍTICO: El archivo no existe.");
+                System.err.println("ERROR: El archivo no existe.");
                 System.exit(1);
             }
             
@@ -60,8 +61,7 @@ public class EV_Registry {
                 ksCargado.load(fis, KEYSTORE_PASS.toCharArray());
             }
             
-            System.out.println("2. Archivo cargado correctamente.");
-            System.out.println("3. Contenido del Keystore:");
+            System.out.println("Archivo cargado correctamente.");
             
             boolean tienePrivada = false;
             boolean tieneConfianza = false;
@@ -76,27 +76,20 @@ public class EV_Registry {
             }
             
             if (tienePrivada && tieneConfianza) {
-                System.out.println("✅ DIAGNÓSTICO: KEYSTORE PERFECTO (Tiene identidad y confianza).");
+                System.out.println("KEYSTORE CORRECTO");
             } else if (!tieneConfianza) {
-                System.err.println("❌ DIAGNÓSTICO: FALTA LA CA DE CONFIANZA. El servidor rechazará todos los clientes.");
-                System.err.println("   Solución: Ejecuta el comando 'keytool -import -alias trusted_ca ...'");
-                // No paramos el programa, pero ya sabes por qué fallará.
+                System.err.println("DIAGNÓSTICO: FALTA LA CA DE CONFIANZA. El servidor rechazará todos los clientes.");
             }
             
         } catch (Exception e) {
-            System.err.println("❌ ERROR CARGANDO KEYSTORE: " + e.getMessage());
+            System.err.println("ERROR CARGANDO KEYSTORE: " + e.getMessage());
             e.printStackTrace();
             System.exit(1);
         }
         System.out.println("==========================================\n");
 
-        // -----------------------------------------------------------
-        // PASO 2: CONFIGURACIÓN DEL SERVIDOR CON EL KEYSTORE YA CARGADO
-        // -----------------------------------------------------------
-        
         port(API_PORT);
         
-        // Variable final para usar dentro de la clase anónima
         final KeyStore keyStoreFinal = ksCargado;
 
         JettyServerFactory jettyServerFactory = new JettyServerFactory() {
@@ -107,32 +100,21 @@ public class EV_Registry {
                 @SuppressWarnings("deprecation")
                 SslContextFactory sslContextFactory = new SslContextFactory();
 
-                // TRUCO FINAL: No le pasamos rutas de archivo (string).
-                // Le pasamos el OBJETO KeyStore que acabamos de verificar que está bien.
-                // Así es imposible que Jetty cargue un archivo incorrecto.
-                
                 sslContextFactory.setKeyStore(keyStoreFinal);
                 sslContextFactory.setKeyStorePassword(KEYSTORE_PASS);
                 
                 sslContextFactory.setTrustStore(keyStoreFinal);
-                sslContextFactory.setTrustStorePassword(KEYSTORE_PASS); // Aunque no suele hacer falta para truststore en memoria
+                sslContextFactory.setTrustStorePassword(KEYSTORE_PASS); 
 
-                // Configuración Permisiva para el Registro
                 sslContextFactory.setWantClientAuth(true);
                 sslContextFactory.setNeedClientAuth(false); 
                 
-                // Desactivar validación de hostname para clientes (crítico en localhost)
                 sslContextFactory.setEndpointIdentificationAlgorithm(null);
 
                 HttpConfiguration httpConfig = new HttpConfiguration();
                 httpConfig.addCustomizer(new SecureRequestCustomizer()); 
-                // ------------------------------------------------
 
-                // 4. Conector
-                ServerConnector sslConnector = new ServerConnector(server,
-                        new SslConnectionFactory(sslContextFactory, "http/1.1"),
-                        new HttpConnectionFactory(httpConfig)); // <--- PASAMOS LA CONFIG AQUÍ
-                
+                ServerConnector sslConnector = new ServerConnector(server,new SslConnectionFactory(sslContextFactory, "http/1.1"), new HttpConnectionFactory(httpConfig));                
                 sslConnector.setPort(API_PORT);
                 server.addConnector(sslConnector);
 
@@ -156,17 +138,15 @@ public class EV_Registry {
 
         Spark.init();
         
-        System.out.println("✅ EV_Registry esperando conexiones...");
+        System.out.println("EV_Registry iniciado correctamente...");
     }
 
-    // --- TUS ENDPOINTS ---
     public static void configurarEndpointRegistro(Gson gson) {
         put("/api/registry/register", (request, response) -> {
              response.type("application/json");
              String jsonBody = request.body();
              RegistroPeticion registroData = gson.fromJson(jsonBody, RegistroPeticion.class);
              
-             // DB Logic
              boolean exito = registrarNuevoCP(registroData.id, registroData.location, registroData.price);
              
              if (exito) {
@@ -192,13 +172,10 @@ public class EV_Registry {
             X509Certificate cpCert = getCertificateFromRequest(request); 
             
             if (cpCert == null) {
-                System.out.println("⛔ Baja rechazada: No hay certificado.");
+                System.out.println("Baja rechazada: No hay certificado.");
                 response.status(401); 
                 return gson.toJson(Map.of("status", "ERROR", "message", "Certificado requerido."));
             }
-
-            // Log para depuración
-            System.out.println("🔔 Petición de baja recibida de: " + cpCert.getSubjectX500Principal());
 
             String cpIdFromCert = parseCNFromSubject(cpCert.getSubjectX500Principal().getName());
             String jsonBody = request.body();
@@ -240,12 +217,13 @@ public class EV_Registry {
 
     private static boolean registrarNuevoCP(String id, String loc, String price) 
     { 
-    	DatabaseManager dbm = new DatabaseManager("192.168.1.102", "evcharging_db", "evcharging", "practica2");
+    	DatabaseManager dbm = new DatabaseManager(databaseIP, "evcharging_db", "evcharging", "practica2");
+    	dbm.createTable(); // crea si no existe la tabla
     	return dbm.InsertCP(id, loc, Double.parseDouble(price), "DESCONECTADO"); 
     }
     private static boolean eliminarCP(String id, String loc, String price) 
     { 
-    	DatabaseManager dbm = new DatabaseManager("192.168.1.102", "evcharging_db", "evcharging", "practica2");
+    	DatabaseManager dbm = new DatabaseManager(databaseIP, "evcharging_db", "evcharging", "practica2");
     	return dbm.DeleteCP(id); 
     }
 }

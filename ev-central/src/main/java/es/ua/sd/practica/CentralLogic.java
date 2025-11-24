@@ -100,18 +100,14 @@ public class CentralLogic extends EV_Central {
     	String type = message.split("#")[0]; //ejemplo mensaje CONNECTION#CP001 -> buscamos el CONNECTION
     	String cpUID = message.split("#")[1]; //ejemplo mensaje CONNECTION#CP001 -> buscamos el CP001
     	
-    	if(type.equals("ALTA"))
-    	{
-    		newCP(cpUID, message.split("#")[2], message.split("#")[3]);
-    	}
     	
     	this.getLastHeartbeat().put(cpUID, Instant.now());
     	
-    	if(type.equals("CONNECTION") || type.equals("ALTA"))
+    	if(type.equals("CONNECTION"))
     	{
     		for(CP cp : cps)
         	{
-        		if(cp.UID.equals(cpUID) && !cp.State.equals("CONECTADO"))
+        		if(cp.UID.equals(cpUID) && !cp.State.equals("CONECTADO") && cp.autenticado)
         		{
         			cp.State = "CONECTADO";
         			javax.swing.SwingUtilities.invokeLater(() -> refreshChargingPoints(gui));
@@ -122,7 +118,7 @@ public class CentralLogic extends EV_Central {
     	{
     		for(CP cp : cps)
         	{
-        		if(cp.UID.equals(cpUID) && cp.State.equals("DESCONECTADO"))
+        		if(cp.UID.equals(cpUID) && cp.State.equals("DESCONECTADO") && cp.autenticado)
         		{
         			cp.State = "CONECTADO";
         			javax.swing.SwingUtilities.invokeLater(() -> refreshChargingPoints(gui));
@@ -133,7 +129,7 @@ public class CentralLogic extends EV_Central {
     	{
     		for(CP cp : cps)
         	{
-        		if(cp.UID.equals(cpUID))
+        		if(cp.UID.equals(cpUID) && cp.autenticado)
         		{
         			cp.State = "AVERIADO";
         			javax.swing.SwingUtilities.invokeLater(() -> refreshChargingPoints(gui));
@@ -147,30 +143,4 @@ public class CentralLogic extends EV_Central {
 		return lastHeartbeat;
 	}
 	
-	public void newCP(String cpid, String location, String Price)
-	{
-		for(CP cp : cps)
-    	{
-    		if(cp.UID.equals(cpid))
-    		{
-    			return;
-    		}
-    	}
-		
-		
-		try (FileWriter fw = new FileWriter("cpdatabase.txt", true);
-	        BufferedWriter bw = new BufferedWriter(fw);
-	        PrintWriter out = new PrintWriter(bw)) {
-
-	        out.println(cpid + ";" + Price + ";" + location + ";DESCONECTADO");
-
-		    } catch (IOException e) {
-		        System.err.println("Error al escribir en cpdatabase.txt: " + e.getMessage());
-		    }
-		
-		CP cp = new CP(cpid, Price, location, "DESCONECTADO");
-        cps.add(cp);
-	}
-    
-
 }

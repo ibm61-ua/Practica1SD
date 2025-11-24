@@ -1,15 +1,20 @@
 # CONFIGURACIÓN DEL CP
 
 #Engine: el puerto debe ser único por CP, es decir, dos CPS no pueden tener el mismo puerto
-ip_engine=192.168.56.1
-port_engine=9001
+ip_engine=192.168.1.102
+port_engine=9002
 
 #Kafka: Ip del PC donde esta iniciado kafka
-ip_broker=192.168.56.1
+ip_broker=192.168.1.102
 
 #Central: Ip y puerto de la central, en este caso el puerto siempre se usa el 8888, por lo que el puerto no es necesario modficarlo
-ip_central=192.168.56.1
+ip_central=192.168.1.102
 port_central=8888
+port_api_auth=8082
+
+#EV_Registry (el puerto estándar de registry será el 8088)
+ip_registry=192.168.1.102
+port_registry=8088
 
 #El nombre del cp, este debe existir en la base de datos, sino, hay que darlo de alta
-nombre_cp=BAR
+nombre_cp=ALC

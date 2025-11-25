@@ -12,7 +12,7 @@ services:
       POSTGRES_PASSWORD: practica2   
       POSTGRES_DB: evcharging_db   
     volumes:
-      - ev_data:/var/lib/postgresql/data
+      - ev_data:/var/lib/postgresql/docker
     command: ["postgres", "-c", "listen_addresses=*"]
 
 volumes:

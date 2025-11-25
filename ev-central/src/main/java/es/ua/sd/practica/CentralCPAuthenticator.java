@@ -14,6 +14,7 @@ import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.eclipse.jetty.server.SslConnectionFactory;
 import org.eclipse.jetty.util.thread.ThreadPool;
 
+import javax.crypto.SecretKey;
 import javax.servlet.http.HttpServletRequest;
 import java.security.KeyStore;
 import java.security.Security;
@@ -161,8 +162,13 @@ public class CentralCPAuthenticator extends EV_Central implements Runnable {
             	}
             }
             
+            String clave = CryptoUtils.generarClave();
+
+            SecretKey keyObj = CryptoUtils.stringToKey(clave);
+            CPKeys.put(registroData.id, keyObj);
+            
             response.status(200);
-            return gson.toJson(Map.of("status", "SUCCESS", "id", registroData.id));
+            return gson.toJson(Map.of("status", "SUCCESS", "id", registroData.id, "key", clave));
         });
 	}
 	

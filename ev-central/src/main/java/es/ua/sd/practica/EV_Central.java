@@ -5,11 +5,14 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import javax.crypto.SecretKey;
 import javax.swing.*;
 import java.awt.*;
 
@@ -30,6 +33,7 @@ public class EV_Central {
 	public static ArrayList<CP> cps = new ArrayList<>();
 	public static Set<String> existingCPids = new HashSet<>();
 	public static CentralMonitorGUI gui;
+	public static Map<String, SecretKey> CPKeys = new ConcurrentHashMap<>();
 	public static int API_PORT_EVW;
 	public static int API_PORT_AUTHENTICATOR;
 	public static String IP_DATABASE;
@@ -187,7 +191,7 @@ public class EV_Central {
 	public static void AddChargingPointFromDB() { 
 	    
 	    Set<String> existingCPids = new HashSet<>(); // IDs de CPs que YA tenemos en memoria
-	    Set<String> dbCPids = new HashSet<>();       // IDs de CPs LEÍDOS de la BD (Fuente de verdad)
+	    Set<String> dbCPids = new HashSet<>();       // IDs de CPs LEÍDOS de la BD
 	    
 	    
 	    List<String> cpsStrings = dbManager.GetAllCPS();
@@ -195,9 +199,9 @@ public class EV_Central {
 	    for (String s : cpsStrings) {
 	        String[] splitted = s.split("\\|");
 	        String currentCPid = splitted[1];
-	        dbCPids.add(currentCPid); // Añadir ID de la BD al Set de BD
+	        dbCPids.add(currentCPid); 
 	        if (!existingCPids.contains(currentCPid)) { 
-	            if (!isCPinMemory(currentCPid)) { // Función auxiliar para chequear la lista cps
+	            if (!isCPinMemory(currentCPid)) { 
 	                CP cp = new CP(splitted[1], splitted[3], splitted[2], "DESCONECTADO");
 	                cps.add(cp);
 	            }

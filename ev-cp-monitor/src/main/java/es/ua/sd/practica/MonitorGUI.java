@@ -24,6 +24,7 @@ import org.bouncycastle.util.io.pem.PemReader;
 import com.google.gson.Gson;
 import okhttp3.*;
 
+import javax.crypto.SecretKey;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
@@ -38,6 +39,10 @@ class RegistroPeticion {
     public RegistroPeticion(String id, String location, String price) {
         this.id = id; this.location = location; this.price = price; this.csrPem = null;
     }
+}
+
+class Key {
+	public String key;
 }
 
 class RegistroRespuesta {
@@ -66,6 +71,8 @@ public class MonitorGUI extends JFrame {
     
     private static final OkHttpClient client;
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
+    
+    private static SecretKey sessionKey;
 
     static {
         try {
@@ -266,7 +273,11 @@ public class MonitorGUI extends JFrame {
 
             try (Response response = mTLSClient.newCall(request).execute()) {
                 if (response.code() == 200) {
+                	String jsonResponse = response.body().string();
                     NewMessage("Autenticación exitosa.");
+                    Key k = GSON.fromJson(jsonResponse, Key.class);
+                    sessionKey = CryptoUtils.stringToKey(k.key);
+                    NewMessage("[Monitor] Guarda clave de crifrado.");
                 } else {
                     NewMessage("Error Autenticación: " + response.code() + " " + response.body().string());
                 }

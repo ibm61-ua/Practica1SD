@@ -129,8 +129,20 @@ public class CentralCPAuthenticator extends EV_Central implements Runnable {
         before((request, response) -> response.header("Access-Control-Allow-Origin", "*"));
         
         configurarEndpointAuteticacion(GSON);
-
+        configurarEndpointFront(GSON);
         Spark.init();
+	}
+	
+	private void configurarEndpointFront(Gson gson)
+	{
+		get("/api/status/all", (request, response) -> {
+            response.type("application/json"); // Establece el tipo de contenido a JSON
+            
+            String jsonStatus = getSystemStatusAsJson(); 
+            
+            System.out.println("HTTP: Petición /api/status/all respondida.");
+            return jsonStatus;
+        });
 	}
 
 	private void configurarEndpointAuteticacion(Gson gson) {

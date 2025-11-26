@@ -1,0 +1,2 @@
+BAR;0.12;Barcelona;DESCONECTADO
+ALC;0.12;Alicante;CONECTADO

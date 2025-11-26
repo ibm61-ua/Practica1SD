@@ -187,7 +187,7 @@ public class MonitorGUI extends JFrame {
 
         ok.addActionListener(e -> {
             location = locField.getText(); price = prField.getText();
-            if(location.isBlank() || price.isBlank()) { NewMessage("Rellena los campos."); return; }
+            if(location.isEmpty() || price.isEmpty()) { NewMessage("Rellena los campos."); return; }
             repaintButtonPanel();
             NewMessage("Configurado: Loc=" + location + ", Price=" + price);
         });

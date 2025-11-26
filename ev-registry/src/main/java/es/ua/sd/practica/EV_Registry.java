@@ -22,7 +22,6 @@ import java.util.Collections;
 import java.util.Map;
 import java.io.File;
 import java.io.FileInputStream;
-
 import static spark.Spark.*;
 
 class RegistroPeticion { 
@@ -141,6 +140,7 @@ public class EV_Registry {
         System.out.println("EV_Registry iniciado correctamente...");
     }
 
+    
     public static void configurarEndpointRegistro(Gson gson) {
         put("/api/registry/register", (request, response) -> {
              response.type("application/json");
@@ -219,7 +219,12 @@ public class EV_Registry {
     { 
     	DatabaseManager dbm = new DatabaseManager(databaseIP, "evcharging_db", "evcharging", "practica2");
     	dbm.createTable(); // crea si no existe la tabla
+    	for (String cp : dbm.GetAllCPS())
+    	{
+    		System.out.println(cp);
+    	}
     	return dbm.InsertCP(id, loc, Double.parseDouble(price), "DESCONECTADO"); 
+    	
     }
     private static boolean eliminarCP(String id, String loc, String price) 
     { 

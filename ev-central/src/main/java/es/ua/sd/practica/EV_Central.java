@@ -57,9 +57,8 @@ public class EV_Central {
         String DB_PASS = "practica2";
 
         dbManager = new DatabaseManager(IP_DATABASE, DB_NAME, DB_USER, DB_PASS);
-        dbManager.createTable();
         
-		startApiServer();
+		
         SwingUtilities.invokeLater(() -> {
             AddCPToGui(gui);
             OnGoingPanel(gui);
@@ -105,37 +104,9 @@ public class EV_Central {
         }).start();
         
     }
-	
-	private static void startApiServer() {
-        // Configura el puerto para el API_Central
-        port(API_PORT_EVW); 
-        
-        options("/*", (request, response) -> {
-            String accessControlRequestHeaders = request.headers("Access-Control-Request-Headers");
-            if (accessControlRequestHeaders != null) {
-                response.header("Access-Control-Allow-Headers", accessControlRequestHeaders);
-            }
-            String accessControlRequestMethod = request.headers("Access-Control-Request-Method");
-            if (accessControlRequestMethod != null) {
-                response.header("Access-Control-Allow-Methods", accessControlRequestMethod);
-            }
-            return "OK";
-        });
-        before((request, response) -> response.header("Access-Control-Allow-Origin", "*"));
 
-        get("/api/status/all", (request, response) -> {
-            response.type("application/json"); // Establece el tipo de contenido a JSON
-            
-            String jsonStatus = getSystemStatusAsJson(); 
-            
-            System.out.println("HTTP: Petición /api/status/all respondida.");
-            return jsonStatus;
-        });
-
-    }
 	
-	
-	private static String getSystemStatusAsJson() {
+	protected static String getSystemStatusAsJson() {
 		String json = "[";
 	    int count = 0;
 	    

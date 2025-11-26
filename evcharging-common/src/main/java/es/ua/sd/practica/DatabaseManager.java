@@ -56,7 +56,6 @@ public class DatabaseManager {
     
     public boolean InsertCP(String nombre, String ciudad, double precio, String estado) {
         String sql = "INSERT INTO CPS(nombre, ciudad, precio, estado) VALUES(?, ?, ?, ?)";
-        System.out.println("gsdgs");
         try (Connection conn = connect();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, nombre);

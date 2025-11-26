@@ -1,5 +1,5 @@
-// URL del API REST de tu EV_Central (Java), corriendo en el puerto 8081
-const CENTRAL_API_URL = 'http://localhost:8081/api/status/all'; 
+// URL del API REST de tu EV_Central (Java), corriendo en el puerto 8083
+const CENTRAL_API_URL = 'http://localhost:8082/api/status/all'; 
 const statusContainer = document.getElementById('central-status'); // Contenedor HTML
 
 // Función principal para obtener y mostrar datos

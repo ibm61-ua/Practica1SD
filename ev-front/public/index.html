@@ -3,19 +3,52 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monitor Central EVCharging</title>
-    <link rel="stylesheet" href="styles.css"> 
+    <title>Monitor Central EV</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="container">
-        <h1>Monitor Central EVCharging 🔌</h1>
-        
-        <div id="central-status">
-            <p>Cargando estado...</p>
+
+    <header>
+        <div class="header-left">
+            <h1>⚡ Monitor Central EV</h1>
+            <span id="connection-status" class="badge online">ONLINE</span>
         </div>
+        <div class="header-right">
+            <div id="weather-container" class="weather-box">
+                ☁️ Cargando clima...
+            </div>
+        </div>
+    </header>
+
+    <div id="system-alerts"></div>
+
+    <div class="dashboard-container">
         
+        <main class="cp-section">
+            <h2>🔌 Puntos de Recarga</h2>
+            <div id="cp-container" class="cp-grid">
+                </div>
+        </main>
+
+        <aside class="sidebar">
+            
+            <div class="panel drivers-panel">
+                <h3>🚗 Drivers / Solicitudes</h3>
+                <ul id="drivers-list">
+                    <li>Esperando datos...</li>
+                </ul>
+            </div>
+
+            <div class="panel logs-panel">
+                <h3>📟 Logs del Sistema</h3>
+                <div id="logs-container" class="logs-box">
+                    </div>
+            </div>
+
+        </aside>
     </div>
-    
-    <script src="app.js"></script> 
+
+    <script src="script.js"></script>
 </body>
 </html>

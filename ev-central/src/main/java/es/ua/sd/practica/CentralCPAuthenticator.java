@@ -1,6 +1,7 @@
 package es.ua.sd.practica;
 
 import com.google.gson.Gson;
+import spark.Service; // IMPORTANTE: Necesario para crear el segundo servidor
 import spark.Spark;
 import spark.embeddedserver.EmbeddedServers;
 import spark.embeddedserver.jetty.EmbeddedJettyFactory;
@@ -26,66 +27,98 @@ import java.io.FileInputStream;
 
 import static spark.Spark.*;
 
-
-class Peticion
-{
-	String id; String location; String price; String csrPem;
+class Peticion {
+    String id; String location; String price; String csrPem;
 }
 
 public class CentralCPAuthenticator extends EV_Central implements Runnable {
-	private static final Gson GSON = new Gson();
+    private static final Gson GSON = new Gson();
     private static final String KEYSTORE_FILE = "ca_registry.p12";
     private static final String KEYSTORE_PASS = "Practica2";
-    
-	@Override
-	public void run() {
-		Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider());
+
+    // DEFINICIÓN DE PUERTOS SEPARADOS
+    private static final int PORT_MTLS = 8082;   // Seguro para CPs
+    private static final int PORT_PUBLIC = 3000; // Público para Front-end
+
+    @Override
+    public void run() {
+        Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider());
+        
+        // Detenemos cualquier instancia previa de Spark
         Spark.stop();
 
+        // ========================================================================
+        // 1. SERVIDOR PÚBLICO (HTTP - Puerto 3000)
+        //    Para el Front-end (JavaScript). Sin certificados, sin errores SSL.
+        // ========================================================================
+        Service publicService = Service.ignite();
+        publicService.port(PORT_PUBLIC);
+
+        // Configuración CORS para el Front-end
+        publicService.before((request, response) -> {
+            response.header("Access-Control-Allow-Origin", "*");
+            response.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+            response.header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
+        });
+
+        // Endpoint de Estado (accesible vía HTTP plano)
+        publicService.get("/api/status/all", (request, response) -> {
+            response.type("application/json");
+            String jsonStatus = getSystemStatusAsJson(); 
+            System.out.println("HTTP (Público 3000): Estado enviado al Front-end.");
+            return jsonStatus;
+        });
+        
+        publicService.post("/api/alert", (request, response) -> {
+            response.type("application/json");
+            
+            // 1. Recibir el JSON
+            String body = request.body();
+            System.out.println("⚠️ ALERTA RECIBIDA DE EV_W: " + body);
+            
+
+            // 3. Responder OK
+            return GSON.toJson(Map.of("status", "RECEIVED"));
+        });
+
+        System.out.println("✅ [Central] API Pública (HTTP) lista en: http://localhost:" + PORT_PUBLIC);
+
+        // ========================================================================
+        // 2. SERVIDOR SEGURO (HTTPS/mTLS - Puerto 8082)
+        //    Para los CPs. Requiere autenticación fuerte.
+        // ========================================================================
+
+        // --- Carga del Keystore ---
         KeyStore ksCargado = null;
         try {
             File f = new File(KEYSTORE_FILE);
-            
             if (!f.exists()) {
                 System.err.println("ERROR: El archivo no existe.");
                 System.exit(1);
             }
-            
             ksCargado = KeyStore.getInstance("PKCS12");
             try (FileInputStream fis = new FileInputStream(f)) {
                 ksCargado.load(fis, KEYSTORE_PASS.toCharArray());
             }
+            System.out.println("Archivo Keystore cargado correctamente.");
             
-            System.out.println("Archivo cargado correctamente.");
-            
-            boolean tienePrivada = false;
+            // Diagnóstico rápido
             boolean tieneConfianza = false;
-            
             for (String alias : Collections.list(ksCargado.aliases())) {
-                boolean isKey = ksCargado.isKeyEntry(alias);
-                boolean isCert = ksCargado.isCertificateEntry(alias);
-                System.out.println("   -> Alias: '" + alias + "' [Privada: " + isKey + ", Confianza: " + isCert + "]");
-                
-                if (isKey) tienePrivada = true;
-                if (isCert) tieneConfianza = true;
+                if (ksCargado.isCertificateEntry(alias)) tieneConfianza = true;
             }
-            
-            if (tienePrivada && tieneConfianza) {
-                System.out.println("KEYSTORE CORRECTO");
-            } else if (!tieneConfianza) {
-                System.err.println("DIAGNÓSTICO: FALTA LA CA DE CONFIANZA. El servidor rechazará todos los clientes.");
-            }
-            
+            if (!tieneConfianza) System.err.println("DIAGNÓSTICO: FALTA LA CA DE CONFIANZA.");
+
         } catch (Exception e) {
             System.err.println("ERROR CARGANDO KEYSTORE: " + e.getMessage());
             e.printStackTrace();
             System.exit(1);
         }
-        System.out.println("==========================================\n");
-        int API = super.API_PORT_AUTHENTICATOR;
-        port(API);
         
         final KeyStore keyStoreFinal = ksCargado;
+
+        // --- Configuración de Spark/Jetty Seguro ---
+        port(PORT_MTLS); // Usamos la instancia estática de Spark para el puerto seguro
 
         JettyServerFactory jettyServerFactory = new JettyServerFactory() {
             @Override
@@ -95,22 +128,27 @@ public class CentralCPAuthenticator extends EV_Central implements Runnable {
                 @SuppressWarnings("deprecation")
                 SslContextFactory sslContextFactory = new SslContextFactory();
 
+                // Identidad del Servidor (HTTPS)
                 sslContextFactory.setKeyStore(keyStoreFinal);
                 sslContextFactory.setKeyStorePassword(KEYSTORE_PASS);
                 
+                // Confianza del Servidor (mTLS - Verificar CPs)
                 sslContextFactory.setTrustStore(keyStoreFinal);
                 sslContextFactory.setTrustStorePassword(KEYSTORE_PASS); 
 
+                // CONFIGURACIÓN ESTRICTA PARA CPs (Puerto 8082)
                 sslContextFactory.setWantClientAuth(true);
-                sslContextFactory.setNeedClientAuth(true); 
+                sslContextFactory.setNeedClientAuth(true); // OBLIGATORIO: Solo CPs con certificado entran aquí
                 
                 sslContextFactory.setEndpointIdentificationAlgorithm(null);
 
                 HttpConfiguration httpConfig = new HttpConfiguration();
                 httpConfig.addCustomizer(new SecureRequestCustomizer()); 
 
-                ServerConnector sslConnector = new ServerConnector(server,new SslConnectionFactory(sslContextFactory, "http/1.1"), new HttpConnectionFactory(httpConfig));                
-                sslConnector.setPort(API);
+                ServerConnector sslConnector = new ServerConnector(server,
+                        new SslConnectionFactory(sslContextFactory, "http/1.1"), 
+                        new HttpConnectionFactory(httpConfig));                
+                sslConnector.setPort(PORT_MTLS);
                 server.addConnector(sslConnector);
 
                 return server;
@@ -126,27 +164,21 @@ public class CentralCPAuthenticator extends EV_Central implements Runnable {
             return new EmbeddedJettyFactory(jettyServerFactory).create(routes, staticFiles, exceptionMapper, hasMultipleHandler);
         });
 
+        // CORS para la parte segura (por si acaso)
         before((request, response) -> response.header("Access-Control-Allow-Origin", "*"));
         
+        // Endpoint de Autenticación (Solo en puerto 8082 seguro)
         configurarEndpointAuteticacion(GSON);
-        configurarEndpointFront(GSON);
+        
+        // Iniciamos el servidor seguro
         Spark.init();
-	}
-	
-	private void configurarEndpointFront(Gson gson)
-	{
-		get("/api/status/all", (request, response) -> {
-            response.type("application/json"); // Establece el tipo de contenido a JSON
-            
-            String jsonStatus = getSystemStatusAsJson(); 
-            
-            System.out.println("HTTP: Petición /api/status/all respondida.");
-            return jsonStatus;
-        });
-	}
+        System.out.println("🔒 [Central] API Segura (mTLS) lista en: https://localhost:" + PORT_MTLS);
+    }
+    
+  
 
-	private void configurarEndpointAuteticacion(Gson gson) {
-		put("/api/auth", (request, response) -> {
+    private void configurarEndpointAuteticacion(Gson gson) {
+        put("/api/auth", (request, response) -> {
             response.type("application/json");
 
             X509Certificate cpCert = getCertificateFromRequest(request); 
@@ -166,25 +198,22 @@ public class CentralCPAuthenticator extends EV_Central implements Runnable {
                 return gson.toJson(Map.of("status", "ERROR", "message", "ID no coincide."));
             }
             
-            for (CP cp : cps)
-            {
-            	if (cp.UID.equals(registroData.id))
-            	{
-            		cp.autenticado = true;
-            	}
+            for (CP cp : cps) {
+                if (cp.UID.equals(registroData.id)) {
+                    cp.autenticado = true;
+                }
             }
             
             String clave = CryptoUtils.generarClave();
-
             SecretKey keyObj = CryptoUtils.stringToKey(clave);
             CPKeys.put(registroData.id, keyObj);
             
             response.status(200);
             return gson.toJson(Map.of("status", "SUCCESS", "id", registroData.id, "key", clave));
         });
-	}
-	
-	public static X509Certificate getCertificateFromRequest(spark.Request request) {
+    }
+    
+    public static X509Certificate getCertificateFromRequest(spark.Request request) {
         if (request.raw() instanceof HttpServletRequest) {
             Object certsAttr = request.raw().getAttribute("javax.servlet.request.X509Certificate");
             if (certsAttr != null && certsAttr instanceof X509Certificate[]) {
@@ -202,5 +231,4 @@ public class CentralCPAuthenticator extends EV_Central implements Runnable {
         int endIndex = subjectDn.indexOf(",", startIndex);
         return (endIndex == -1) ? subjectDn.substring(startIndex).trim() : subjectDn.substring(startIndex, endIndex).trim();
     }
-	
 }

@@ -34,13 +34,12 @@ public class EV_Central {
 	public static Set<String> existingCPids = new HashSet<>();
 	public static CentralMonitorGUI gui;
 	public static Map<String, SecretKey> CPKeys = new ConcurrentHashMap<>();
-	public static int API_PORT_EVW;
-	public static int API_PORT_AUTHENTICATOR;
+	public static int API_PORT;
 	public static String IP_DATABASE;
 	private static DatabaseManager dbManager;
   
 	public static void main(String[] args) {
-		if (args.length < 5) 
+		if (args.length < 4) 
 		{
 			System.err.println("Pase por argumentos el puerto del socket, la IP y puerto del broker, la IP de la base de datos, el puerto de la API de EV_w y el puerto de la API de autenticacion ");
 			return;
@@ -48,8 +47,7 @@ public class EV_Central {
 		gui = new CentralMonitorGUI(cps);
 		port = Integer.parseInt(args[0]);
         brokerIP = args[1];
-        API_PORT_AUTHENTICATOR = Integer.parseInt(args[4]);
-        API_PORT_EVW = Integer.parseInt(args[3]);
+        API_PORT = Integer.parseInt(args[3]);
         IP_DATABASE = args[2];
         
         String DB_NAME = "evcharging_db";
@@ -122,7 +120,7 @@ public class EV_Central {
 	        // STATUS
 	        json += "\"status\":\"" + cp.State + "\",";
 	        // TEMPERATURE
-	        json += "\"temmp\":\"" + cp.temperature + "\",";
+	        json += "\"temp\":\"" + cp.temperature + "\",";
 	        // ALERT
 	        json += "\"alert\":\"" + cp.alert + "\",";
 	        // PRICE

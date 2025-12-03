@@ -10,6 +10,7 @@ for /f "tokens=1,2 delims==" %%a in (args.txt) do (
     )
 )
 
-java -jar EV_Central.jar %port_cps% %broker_kafka% %database_ip% %api_port_ev_Weather% %api_port_authenticator%
+java -jar EV_Central.jar %port_cps% %broker_kafka% %database_ip% %api_port%
+pause
 
 

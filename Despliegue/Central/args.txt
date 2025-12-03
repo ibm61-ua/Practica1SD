@@ -1,5 +1,4 @@
 port_cps=8888
-broker_kafka=172.21.243.233:9092
-database_ip=172.21.243.233
-api_port_ev_Weather=8081
-api_port_authenticator=8082
+broker_kafka=172.21.243.238:9092
+database_ip=172.21.243.238
+api_port=8082

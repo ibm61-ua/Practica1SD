@@ -34,7 +34,7 @@ public class EV_Driver {
 		
 		Producer p = new Producer(IP_BROKER + ":" + Port_BROKER, CommonConstants.REQUEST);
 		SwingUtilities.invokeLater(() -> {
-           gui = new DriverGUI(ID_Driver, p);
+           gui = new DriverGUI(ID_Driver, p, IP_BROKER);
 	       gui.CreateButtons();
 	       gui.Log("");
 	   		
@@ -71,64 +71,39 @@ public class EV_Driver {
 	}
 	
 	public static void handleControl(String message) {
-		//mensaje ejemplo: CHARGING#ALC001#DV001#10.0#10.0
-		if(message.contains("RELOAD"))
-		{
-			handleReload(message);
-			return;
-		}
-		
-		if(!message.contains(ID_Driver)) return;
-		
-		if(!message.split("#")[0].equals("END") && !message.split("#")[0].equals("CHARGING") && !message.split("#")[0].equals("NOAVIABLE")) return;
-		
-		if(message.split("#")[0].equals("NOAVIABLE"))
-		{
-			gui.Log("CP no disponible. Cancelado el suministro.");
-			gui.Suministrando = false;
-			return;
-		}
-		
-		if(message.split("#")[0].equals("END"))
-		{
-			System.out.println(message);
-			gui.Log("[" + message.split("#")[0] + "] CP: " + message.split("#")[1] + " " +  message.split("#")[3]);
-			gui.Suministrando = false;
-			return;
-		}
-		Iterator<String> it = gui.logBuffer.iterator();
-		String part = message.split("#")[1];
+	    if (!message.contains(ID_Driver)) return;
 
-		while (it.hasNext()) {
-		    String s = it.next();
-		    if (s.contains(part)) {
-		        it.remove();
-		    }
-		}
-        gui.Log("[" + message.split("#")[0] + "] CP: " + message.split("#")[1] + " -> " + message.split("#")[3] + "KwH/" + message.split("#")[4] + "KwH");
-    }
+	    String[] parts = message.split("#");
+	    String tipo = parts[0];
 
-	private static void handleReload(String message) {
-	    try {
-	        message = message.substring("RELOAD#".length());
+	    if (tipo.equals("NOAVIABLE")) {
+	        gui.Log("[ERROR] CP no disponible. Suministro cancelado.");
+	        gui.Suministrando = false;
+	        return;
+	    }
+	    
+	    if (tipo.equals("REJECT")) {
+	        gui.Log("[ERROR] CP ha cancelado el suministro");
+	        gui.Suministrando = false;
+	        return;
+	    }
 
-	        String[] cpEntries = message.split("\\|");
-
-	        try (BufferedWriter writer = new BufferedWriter(new FileWriter("cpdatabase.txt", false))) {
-	            
-	            for (String cpData : cpEntries) {
-	                cpData = cpData.trim();
-	                if (cpData.isEmpty()) continue;
-
-	                writer.write(cpData + ";DESCONECTADO");
-	                writer.newLine();
-	            }
-	        }
+	    if (tipo.equals("END")) {
+	        String infoExtra = (parts.length > 3) ? parts[3] : "";
 	        
-	        gui.CreateButtons();
+	        gui.Log("[FIN] CP: " + parts[1] + " Terminado. " + infoExtra);
+	        gui.Suministrando = false;
+	        return;
+	    }
 
-	    } catch (IOException e) {
-	    } catch (Exception e) {
+	    if (tipo.equals("CHARGING")) {
+	        String logUpdate = String.format("[CARGANDO] CP: %s -> %s kWh / %s kWh", 
+	                                         parts[1], // ID del CP
+	                                         parts[3], // Actual
+	                                         parts[4]  // Total
+	        );
+	        
+	        gui.Log(logUpdate);
 	    }
 	}
 

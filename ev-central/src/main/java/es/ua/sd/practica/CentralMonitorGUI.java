@@ -1,8 +1,8 @@
 package es.ua.sd.practica;
 
+import javax.crypto.SecretKey;
 import javax.swing.*;
 import javax.swing.border.TitledBorder;
-
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -10,254 +10,255 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
-import java.util.Iterator;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class CentralMonitorGUI extends JFrame {
-	private JPanel panelPrincipal;
-	private JPanel panelSecundario;
-	private JPanel MPanel = new JPanel();
-	private JPanel RPanel = new JPanel();	
-	private static ArrayList<CP> cps;
-	
-	public static ArrayList<String> mBuffer = new ArrayList<>();
-	public static ArrayList<String> rBuffer = new ArrayList<>();
+    
+    private JPanel panelPrincipal;
+    private JPanel panelInferior;  
+    
+    private JPanel auditPanel;    
+    private JTextArea auditTextArea; 
 
-	public CentralMonitorGUI(ArrayList<CP> cps) {
-		super("EVCharging Network - Central Monitor");
+    private JPanel ongoingPanel;   
+    private JPanel ongoingContent; 
 
-		this.cps = cps;
-		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-		setSize(1290, 720);
+    private static ArrayList<CP> cps;
+    public static Map<String, SecretKey> CPKeys = new ConcurrentHashMap<>();
+    
+    public static ArrayList<String> ongoingBuffer = new ArrayList<>();
 
-		panelPrincipal = new JPanel();
-		panelPrincipal.setLayout(new GridLayout(0, 6, 10, 10)); // 4 CPs por fila
-		panelPrincipal.setPreferredSize(new Dimension(1290, 400));
+    public CentralMonitorGUI(ArrayList<CP> cps, Map<String, SecretKey> cPKeys) {
+        super("EVCharging Network - Central Monitor");
+        CentralMonitorGUI.cps = cps;
+        CPKeys = cPKeys;
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setSize(1300, 800);
+        setLayout(new BorderLayout(10, 10)); // Espaciado entre zonas
 
-		panelSecundario = new JPanel();
-		panelSecundario.setLayout(new BorderLayout());
-		panelSecundario.setPreferredSize(new Dimension(1290, 270));
+        panelPrincipal = new JPanel();
+        panelPrincipal.setLayout(new GridLayout(0, 4, 10, 10)); 
+        panelPrincipal.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        
+        JScrollPane scrollCPs = new JScrollPane(panelPrincipal);
+        scrollCPs.setBorder(BorderFactory.createTitledBorder("Puntos de Carga (CPs)"));
+        scrollCPs.setPreferredSize(new Dimension(1300, 400)); 
+        
+        this.add(scrollCPs, BorderLayout.NORTH);
+        panelInferior = new JPanel();
+        panelInferior.setLayout(new GridLayout(1, 2, 10, 0)); 
+        panelInferior.setPreferredSize(new Dimension(1300, 350));
+        panelInferior.setBorder(BorderFactory.createEmptyBorder(0, 10, 10, 10));
 
-		this.add(panelPrincipal, BorderLayout.NORTH);
-		this.add(panelSecundario, BorderLayout.SOUTH);
-		setVisible(true);
-	}
+        auditPanel = new JPanel(new BorderLayout());
+        TitledBorder bordeAudit = BorderFactory.createTitledBorder("Registro de Auditoría");
+        bordeAudit.setTitleFont(new Font("SansSerif", Font.BOLD, 16));
+        auditPanel.setBorder(bordeAudit);
 
-	public void addChargingPoint(CP cp) {
-		JPanel cpPanel = new JPanel();
-		cpPanel.setLayout(new BoxLayout(cpPanel, BoxLayout.Y_AXIS));
-		cpPanel.setBorder(BorderFactory.createTitledBorder(cp.UID));
-		if(cp.State.equals("DESCONECTADO"))
-			cpPanel.setBackground(Color.GRAY);
-		if(cp.State.equals("CONECTADO") || cp.State.equals("CARGANDO"))
-			cpPanel.setBackground(Color.GREEN);
-		if(cp.State.equals("AVERIADO"))
-			cpPanel.setBackground(Color.RED);
-		if(cp.State.equals("PARADO"))
-			cpPanel.setBackground(Color.ORANGE);
+        auditTextArea = new JTextArea();
+        auditTextArea.setEditable(false);
+        auditTextArea.setFont(new Font("Monospaced", Font.PLAIN, 14));
+        auditTextArea.setBackground(new Color(30, 30, 30)); 
+        auditTextArea.setForeground(Color.GREEN);
+        
+        JScrollPane scrollAudit = new JScrollPane(auditTextArea);
+        scrollAudit.getVerticalScrollBar().addAdjustmentListener(e -> e.getAdjustable().setValue(e.getAdjustable().getMaximum()));
+        
+        auditPanel.add(scrollAudit, BorderLayout.CENTER);
+        panelInferior.add(auditPanel); // Añadir a la izquierda
 
-		JLabel label = new JLabel(cp.Location);
-		label.setForeground(Color.WHITE);
+        ongoingPanel = new JPanel(new BorderLayout());
+        TitledBorder bordeOngoing = BorderFactory.createTitledBorder("On-Going Driver Requests");
+        bordeOngoing.setTitleFont(new Font("SansSerif", Font.BOLD, 16));
+        ongoingPanel.setBorder(bordeOngoing);
 
-		Font fuenteActual = label.getFont();
-		Font fuenteNueva = new Font(fuenteActual.getName(), fuenteActual.getStyle(), 16);
-		label.setFont(fuenteNueva);
+        ongoingContent = new JPanel();
+        ongoingContent.setLayout(new BoxLayout(ongoingContent, BoxLayout.Y_AXIS));
+        
+        JScrollPane scrollOngoing = new JScrollPane(ongoingContent);
+        ongoingPanel.add(scrollOngoing, BorderLayout.CENTER);
+        
+        panelInferior.add(ongoingPanel);
 
-		cpPanel.add(label);
+        this.add(panelInferior, BorderLayout.CENTER);
 
-		label = new JLabel(cp.Price + "€/kWh");
-		label.setForeground(Color.WHITE);
+        setVisible(true);
+        
+        refreshChargingPoints();
+        updateAuditLog(); 
+    }
+    public void refreshChargingPoints() {
+        panelPrincipal.removeAll();
 
-		label.setFont(fuenteNueva);
-		cpPanel.add(label);
-		
-		
-		if(cp.State.equals("CARGANDO"))
-		{
-			label = new JLabel("-------------------");
-			label.setForeground(Color.WHITE);
+        for (CP cp : cps) {
+            addChargingPointWidget(cp);
+        }
 
-			label.setFont(fuenteNueva);
-			cpPanel.add(label);
-			
-			label = new JLabel("Driver: " + cp.driver);
-			label.setForeground(Color.WHITE);
+        panelPrincipal.revalidate();
+        panelPrincipal.repaint();
+    }
+    
+    private void addChargingPointWidget(CP cp) {
+        JPanel cpPanel = new JPanel();
+        cpPanel.setLayout(new BoxLayout(cpPanel, BoxLayout.Y_AXIS));
+        cpPanel.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(Color.BLACK, 1),
+            BorderFactory.createEmptyBorder(10, 10, 10, 10)
+        ));
 
-			label.setFont(fuenteNueva);
-			cpPanel.add(label);
-			
-			label = new JLabel(String.valueOf(cp.KWHRequested) + "KwH");
-			label.setForeground(Color.WHITE);
+        Color bgColor = Color.LIGHT_GRAY;
+        if(cp.State.equals("DESCONECTADO")) bgColor = Color.LIGHT_GRAY;
+        if(cp.State.equals("CONECTADO"))    bgColor = new Color(144, 238, 144); // Verde claro
+        if(cp.State.equals("CARGANDO"))     bgColor = new Color(255, 255, 224); // Amarillo claro
+        if(cp.State.equals("AVERIADO"))     bgColor = new Color(255, 99, 71);   // Rojo tomate
+        if(cp.State.equals("PARADO"))       bgColor = new Color(255, 165, 0);   // Naranja
 
-			label.setFont(fuenteNueva);
-			cpPanel.add(label);
-			
-			String euros = String.valueOf(Float.parseFloat(cp.Price) * cp.KWHRequested);
-			
-			label = new JLabel("Price:" + euros + " euros.");
-			label.setForeground(Color.WHITE);
+        cpPanel.setBackground(bgColor);
 
-			label.setFont(fuenteNueva);
-			cpPanel.add(label);
+        Font fontBold = new Font("SansSerif", Font.BOLD, 14);
+        Font fontPlain = new Font("SansSerif", Font.PLAIN, 12);
 
-		}
-		
-		if(cp.State.equals("CONECTADO"))
-		{
-			JButton StopButton = new JButton("STOP");
-			StopButton.addActionListener(new ActionListener() {
-			    @Override
-			    public void actionPerformed(ActionEvent e) {
-			        cp.State = "PARADO";
-			        refreshChargingPoints();
-			        MessagePanel(cp.UID + "#OFF");
-			    }
-			});
-			
-			cpPanel.add(StopButton);
-		}
-		else if(cp.State.equals("PARADO"))
-		{
-			JButton StartButton = new JButton("START");
-			StartButton.addActionListener(new ActionListener() {
-			    @Override
-			    public void actionPerformed(ActionEvent e) {
-			        cp.State = "CONECTADO";
-			        refreshChargingPoints();
-			        MessagePanel(cp.UID + "#ON");
-			    }
-			});
-			
-			cpPanel.add(StartButton);
-		}
-		
+        JLabel title = new JLabel(cp.UID + " (" + cp.State + ")");
+        title.setFont(fontBold);
+        title.setAlignmentX(Component.CENTER_ALIGNMENT);
+        cpPanel.add(title);
+        cpPanel.add(Box.createVerticalStrut(5));
 
-		panelPrincipal.add(cpPanel);
-		this.revalidate();
-		this.repaint();
-	}
-	
-	public void deleteOnGoinMessage(String name)
-	{
-		for(String s : rBuffer)
-		{
-			if(s.contains(name))
-			{
-				int pos = rBuffer.indexOf(s);
-				rBuffer.remove(pos);
-				OnGoingPanel("");
-			}
-		}
-	}
+        JLabel loc = new JLabel(cp.Location);
+        loc.setAlignmentX(Component.CENTER_ALIGNMENT);
+        cpPanel.add(loc);
 
-	public void OnGoingPanel(String rMessage) {
-		RPanel.removeAll();
-		RPanel.revalidate();
-		RPanel.repaint();
-		this.rBuffer.add(rMessage);
-		int nuevoTamano = 16;
-		Font fuentePanel = new Font("SansSerif", Font.BOLD, nuevoTamano);
-		TitledBorder bordeTitulado = BorderFactory.createTitledBorder("ON_GOING DRIVER REQUESTS");
-		bordeTitulado.setTitleFont(fuentePanel);
-		bordeTitulado.setTitleColor(Color.BLACK);
-		RPanel.setBorder(bordeTitulado);
-		RPanel.setLayout(new BoxLayout(RPanel, BoxLayout.Y_AXIS));
-		RPanel.setPreferredSize(new Dimension(610, 400));
-		for (String m : rBuffer)
-		{
-			JLabel label = new JLabel(m);
-			label.setForeground(Color.BLACK);
+        JLabel price = new JLabel(cp.Price + " €/kWh");
+        price.setAlignmentX(Component.CENTER_ALIGNMENT);
+        cpPanel.add(price);
+        
+        JLabel temp = new JLabel(cp.temperature + "°C");
+        price.setAlignmentX(Component.CENTER_ALIGNMENT);
+        cpPanel.add(temp);
 
-			Font fuenteActual = label.getFont();
-			Font fuenteNueva = new Font(fuenteActual.getName(), fuenteActual.getStyle(), 16);
-			label.setFont(fuenteNueva);
-			RPanel.add(label);
-		}
+        if(cp.State.equals("CARGANDO")) {
+            cpPanel.add(new JSeparator());
+            JLabel driver = new JLabel(cp.driver);
+            driver.setAlignmentX(Component.CENTER_ALIGNMENT);
+            cpPanel.add(driver);
+            
+            JLabel kwh = new JLabel(cp.KWHRequested + " kWh");
+            kwh.setAlignmentX(Component.CENTER_ALIGNMENT);
+            cpPanel.add(kwh);
+            
+            float cost = Float.parseFloat(cp.Price) * cp.KWHRequested;
+            JLabel total = new JLabel(String.format("Total: %.2f €", cost));
+            total.setFont(fontBold);
+            total.setAlignmentX(Component.CENTER_ALIGNMENT);
+            cpPanel.add(total);
+        }
 
-		panelSecundario.add(RPanel, BorderLayout.EAST);
-		this.revalidate();
-		this.repaint();
-	}
+        cpPanel.add(Box.createVerticalStrut(10));
+        JPanel btnPanel = new JPanel();
+        btnPanel.setOpaque(false);
 
-	public void MessagePanel(String mMessage) {
-		MPanel.removeAll();
-		MPanel.revalidate();
-		MPanel.repaint();
-		
-		if( mMessage.contains("#"))
-		{
-			String[] split = mMessage.split("#");
-			if(split[1].equals("OFF"))
-			{
-				this.mBuffer.add(split[0] + " out of order");
-			}
-			else
-			{
-				Iterator<String> it = mBuffer.iterator();
-				while (it.hasNext()) {
-				    String msg = it.next();
-				    if (msg.equals(split[0] + " out of order")) {
-				        it.remove();
-				    }
-				}
-				
-			}
-		}
-		
-		int nuevoTamano = 16;
-		Font fuentePanel = new Font("SansSerif", Font.BOLD, nuevoTamano);
-		TitledBorder bordeTitulado = BorderFactory.createTitledBorder("APPLICATION MESSAGES");
-		bordeTitulado.setTitleFont(fuentePanel);
-		bordeTitulado.setTitleColor(Color.BLACK);
-		MPanel.setBorder(bordeTitulado);
-		MPanel.setPreferredSize(new Dimension(610, 400));
-		
-		for (String m : mBuffer)
-		{
-			JLabel label = new JLabel(m);
-			label.setForeground(Color.BLACK);
+        if(cp.State.equals("CONECTADO")) {
+            JButton stopBtn = new JButton("STOP");
+            stopBtn.setBackground(Color.RED);
+            stopBtn.setForeground(Color.WHITE);
+            stopBtn.addActionListener(e -> {
+                cp.State = "PARADO";
+                RegistroDeAuditoria.NewLog("Central", "Event", "MANUAL STOP: " + cp.UID + " detenido por operador.");
+                refreshChargingPoints();
+                updateAuditLog();
+            });
+            
+            JButton revokeBtn = new JButton("Revocar clave");
+            revokeBtn.setBackground(Color.RED);
+            revokeBtn.setForeground(Color.WHITE);
+            revokeBtn.addActionListener(e -> {
+                revocarClaveManualmente(cp.UID);
+            });
+            btnPanel.add(stopBtn);
+            btnPanel.add(revokeBtn);
+        } 
+        else if(cp.State.equals("PARADO")) {
+            JButton startBtn = new JButton("START");
+            startBtn.setBackground(Color.GREEN);
+            startBtn.addActionListener(e -> {
+                cp.State = "CONECTADO";
+                RegistroDeAuditoria.NewLog("Central", "Event", "MANUAL START: " + cp.UID + " activado por operador.");
+                refreshChargingPoints();
+                updateAuditLog();
+            });
+            JButton revokeBtn = new JButton("Revocar clave");
+            revokeBtn.setBackground(Color.RED);
+            revokeBtn.setForeground(Color.WHITE);
+            revokeBtn.addActionListener(e -> {
+                revocarClaveManualmente(cp.UID);
+            });
+            btnPanel.add(startBtn);
+            btnPanel.add(revokeBtn);
+        }
 
-			Font fuenteActual = label.getFont();
-			Font fuenteNueva = new Font(fuenteActual.getName(), fuenteActual.getStyle(), 16);
-			label.setFont(fuenteNueva);
-			MPanel.add(label);
-		}
-		panelSecundario.add(MPanel, BorderLayout.WEST);
-		this.revalidate();
-		this.repaint();
-	}
+        cpPanel.add(btnPanel);
+        panelPrincipal.add(cpPanel);
+    }
+    
+    public void revocarClaveManualmente(String cpId) {
+        if (CPKeys.containsKey(cpId)) {
+            CPKeys.remove(cpId);
+        }
 
-	public void clearAllChargingPoints() {
-		panelPrincipal.removeAll();
-		panelPrincipal.revalidate();
-	    panelPrincipal.repaint();
-		
-	}
-	
-	public void AddCPToGui() {
-		for(CP cp : cps)
-		{
-			addChargingPoint(cp);
-		}
-		
-	}
-	
-	public static void Serialize()
-	{
-		try (FileWriter fileWriter = new FileWriter("cpdatabase.txt", false); PrintWriter printWriter = new PrintWriter(fileWriter)) {
+        for (CP cp : cps) {
+            if (cp.UID.equals(cpId)) {
+                cp.autenticado = false;
+                cp.State = "DESCONECTADO";
+                
+                RegistroDeAuditoria.NewLog("Central", "Security", "Clave revocada manualmente para " + cpId);
+                break;
+            }
+        }
 
-				for (CP cp : cps)
-				{
-					String str = cp.UID + ";" + cp.Price + ";" + cp.Location + ";" + cp.State;
-		            printWriter.println(str);
-				}
-	        } catch (IOException e) {
-	            System.err.println("Error al escribir en el archivo: " + e.getMessage());
-	        }
-	}
-	
-	public void refreshChargingPoints() {
-		Serialize();
-	    this.clearAllChargingPoints(); 
-	    AddCPToGui(); 
-	}
+        refreshChargingPoints(); 
+        updateAuditLog();
+    }
+
+
+    
+    public void updateAuditLog() {
+        StringBuilder sb = new StringBuilder();
+        for (String log : RegistroDeAuditoria.log) {
+            sb.append(log).append("\n");
+        }
+        auditTextArea.setText(sb.toString());
+    }
+
+    public void addOngoingMessage(String message) {
+        if (!ongoingBuffer.contains(message)) {
+            ongoingBuffer.add(message);
+            refreshOngoingPanel();
+        }
+    }
+
+    public void removeOngoingMessage(String messagePattern) {
+        ongoingBuffer.removeIf(s -> s.contains(messagePattern));
+        refreshOngoingPanel();
+    }
+
+    private void refreshOngoingPanel() {
+        ongoingContent.removeAll();
+        
+        for (String msg : ongoingBuffer) {
+            JPanel item = new JPanel(new FlowLayout(FlowLayout.LEFT));
+            item.setBackground(Color.WHITE);
+            item.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, Color.LIGHT_GRAY));
+            
+            JLabel text = new JLabel(msg);
+            text.setFont(new Font("SansSerif", Font.PLAIN, 14));
+            
+            item.add(text);
+            ongoingContent.add(item);
+        }
+        
+        ongoingContent.revalidate();
+        ongoingContent.repaint();
+    }
+
 }

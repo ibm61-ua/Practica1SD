@@ -1,6 +1,7 @@
-// --- CONSTANTES API ---
-const CENTRAL_API_URL = 'http://localhost:3000/api/status/cp';  // CPs, Drivers, Weather
-const LOG_API_URL = 'http://localhost:3000/api/status/log';     // Solo Logs
+// --- CONFIGURACIÓN DE APIs ---
+const CENTRAL_API_URL = window.CONFIG.CENTRAL_API_URL;
+const LOG_API_URL = window.CONFIG.LOG_API_URL;
+const DRIVER_API_URL = window.CONFIG.DRIVER_API_URL; // Nueva constante
 
 // --- REFERENCIAS AL DOM ---
 const cpContainer = document.getElementById('cp-container');
@@ -11,8 +12,7 @@ const alertContainer = document.getElementById('system-alerts');
 const statusBadge = document.getElementById('connection-status');
 
 // =============================================================================
-// 1. FETCH DE ESTADO DEL SISTEMA (CPs, Drivers, Clima)
-//    Se ejecuta frecuentemente (tiempo real)
+// 1. FETCH DE ESTADO DE CPs (Sistema Principal)
 // =============================================================================
 async function fetchSystemStatus() { 
     try {
@@ -24,9 +24,7 @@ async function fetchSystemStatus() {
         
         const data = await response.json(); 
         
-        // Si obtenemos los CPs, consideramos que el sistema está ONLINE
         updateConnectionStatus(true);
-        
         renderSystemData(data);
         
     } catch (error) {
@@ -37,15 +35,12 @@ async function fetchSystemStatus() {
 
 // =============================================================================
 // 2. FETCH DE LOGS
-//    Se puede ejecutar con menos frecuencia para no saturar
 // =============================================================================
 async function fetchLogs() { 
     try {
         const response = await fetch(LOG_API_URL); 
         
         if (!response.ok) {
-            // No marcamos offline todo el sistema si solo fallan los logs, 
-            // pero lo mostramos en consola
             throw new Error(`Error Logs: ${response.status}`);
         }
         
@@ -57,7 +52,29 @@ async function fetchLogs() {
     }
 }
 
-// --- ACTUALIZAR INDICADOR ONLINE/OFFLINE ---
+// =============================================================================
+// 3. FETCH DE DRIVERS (NUEVO)
+// =============================================================================
+async function fetchDrivers() { 
+    try {
+        const response = await fetch(DRIVER_API_URL); 
+        
+        if (!response.ok) {
+            throw new Error(`Error Drivers: ${response.status}`);
+        }
+        
+        // Se espera formato: ["FECHA HORA LUGAR VALOR ID", ...]
+        const data = await response.json(); 
+        renderDriversData(data);
+        
+    } catch (error) {
+        console.error("Fallo obteniendo Drivers:", error);
+    }
+}
+
+// =============================================================================
+// GESTIÓN DE ESTADO DE CONEXIÓN
+// =============================================================================
 function updateConnectionStatus(isOnline) {
     if (!statusBadge) return;
 
@@ -66,7 +83,6 @@ function updateConnectionStatus(isOnline) {
         statusBadge.className = "badge online";
         statusBadge.style.backgroundColor = "#28a745";
         statusBadge.style.color = "white";
-        // Limpiamos alerta crítica de conexión si vuelve
         if (alertContainer && alertContainer.innerHTML.includes("Sin conexión")) {
             alertContainer.innerHTML = '';
         }
@@ -83,15 +99,14 @@ function updateConnectionStatus(isOnline) {
 }
 
 // =============================================================================
-// RENDERIZADO PARTE A: CPs, DRIVERS, CLIMA
+// RENDERIZADO DE CPs (Sistema)
 // =============================================================================
 function renderSystemData(data) {
     const safeData = data || {};
 
-    // 2. RENDERIZAR CPs
     if (cpContainer) {
-        // Detectamos si data es un array o un objeto con propiedad cps
         let cps = [];
+        // Soporte para array directo o objeto {cps: []}
         if (Array.isArray(safeData)) {
             cps = safeData;
         } else if (Array.isArray(safeData.cps)) {
@@ -108,22 +123,11 @@ function renderSystemData(data) {
                 let icon = '⚪';
                 let cardColor = '#f8f9fa';
 
-                if (status === "CONECTADO") { statusClass = 'success'; icon = '🟢'; cardColor = '#d4edda'; }
-                else if (status === "CARGANDO")  { statusClass = 'charging'; icon = '⚡'; cardColor = '#fff3cd'; }
-                else if (status === "AVERIADO")  { statusClass = 'danger'; icon = '🔴'; cardColor = '#f8d7da'; }
-                else if (status === "PARADO")    { statusClass = 'warning'; icon = '⏸️'; cardColor = '#e2e3e5'; }
+                if (status === "CONECTADO") { statusClass = 'success'; icon = '🟢'; cardColor = '#62d07bff'; }
+                else if (status === "CARGANDO")  { statusClass = 'charging'; icon = '⚡'; cardColor = '#22ff00ff'; }
+                else if (status === "AVERIADO")  { statusClass = 'danger'; icon = '🔴'; cardColor = '#f53141ff'; }
+                else if (status === "PARADO")    { statusClass = 'warning'; icon = '⏸️'; cardColor = '#ffb700ff'; }
 
-                
-                let chargingInfo = '';
-                if (status === "CARGANDO") {
-                    chargingInfo = `
-                        <div style="margin-top:10px; padding-top:10px; border-top:1px solid #ccc; font-size:0.9em;">
-                            <strong>Cargando:</strong><br>
-                            👤 ${cp.driver || '?'}<br>
-                            🔋 ${cp.KWHRequested || 0} kWh
-                        </div>
-                    `;
-                }
 
                 cpsHtml += `
                     <div class="cp-card ${statusClass}" style="background-color: ${cardColor}; border: 1px solid #ccc; border-radius: 8px; padding: 15px; width: 200px; box-shadow: 2px 2px 5px rgba(0,0,0,0.1);">
@@ -132,12 +136,11 @@ function renderSystemData(data) {
                             <span style="font-size:1.2em;">${icon}</span>
                         </div>
                         <div class="cp-body">
-                            <p style="margin:5px 0;">📍 ${cp.location || 'N/A'}</p>
-                            <p style="margin:5px 0;">💰 ${cp.price} €/kWh</p>
+                            <p style="margin:5px 0;"> ${cp.location || 'N/A'}</p>
+                            <p style="margin:5px 0;"> ${cp.price} €/kWh</p>
                             <div style="display:flex; justify-content:space-between; margin-top:10px; font-size:0.85em; color:#555;">
-                                ${(cp.temp && cp.temp > 0) ? `<span>🌡️ ${cp.temp}°C</span>` : ''}
+                                ${(cp.temp) ? `<span> ${cp.temp}°C</span>` : ''}
                             </div>
-                            ${chargingInfo}
                         </div>
                     </div>
                 `;
@@ -145,27 +148,30 @@ function renderSystemData(data) {
         }
         cpContainer.innerHTML = cpsHtml;
     }
-
-    // 3. RENDERIZAR DRIVERS
-    if (driversList) {
-        const drivers = Array.isArray(safeData.drivers) ? safeData.drivers : [];
-        let driversHtml = '';
-        if (drivers.length > 0) {
-            drivers.forEach(d => {
-                driversHtml += `<li style="padding: 5px 0; border-bottom: 1px solid #eee;">🚗 ${d}</li>`;
-            });
-        } else {
-            driversHtml = '<li style="color:#999; font-style:italic;">Sin actividad reciente.</li>';
-        }
-        driversList.innerHTML = driversHtml;
-    }
 }
 
-// =============================================================================
-// RENDERIZADO PARTE B: LOGS Y ALERTAS DE SISTEMA
-// =============================================================================
+function renderDriversData(data) {
+    if (!driversList) return;
+
+    let drivers = [];
+    if (Array.isArray(data)) {
+        drivers = data;
+    }
+
+    let driversHtml = '';
+    if (drivers.length > 0) {
+        [...drivers].reverse().forEach(d => {
+            driversHtml += `<li style="padding: 5px 0; border-bottom: 1px solid #eee; font-size: 0.9em;">
+                 ${d}
+            </li>`;
+        });
+    } else {
+        driversHtml = '<li style="color:#999; font-style:italic;">Sin actividad de conductores.</li>';
+    }
+    driversList.innerHTML = driversHtml;
+}
+
 function renderLogsData(data) {
-    // Aceptamos que data pueda ser un array directo ["log1", "log2"] o un objeto { logs: [] }
     let logs = [];
     if (Array.isArray(data)) {
         logs = data;
@@ -173,13 +179,12 @@ function renderLogsData(data) {
         logs = data.logs;
     }
 
-    // 1. RENDERIZAR LOGS
     if (logsContainer) {
         let logsHtml = '';
         if (logs.length > 0) {
             [...logs].reverse().forEach(log => {
                 const isError = log.includes("ERROR") || log.includes("Fallo") || log.includes("ALERTA");
-                const colorStyle = isError ? 'color: #dc3545; font-weight:bold;' : 'color: #ffffffff;';
+                const colorStyle = isError ? 'color: #dc3545; font-weight:bold;' : 'color: #ffffffff;'; // Cambié blanco a oscuro para legibilidad si el fondo es claro
                 logsHtml += `<div class="log-entry" style="${colorStyle} margin-bottom:4px; font-family:monospace;">
                                 <span style="color:#aaa;">></span> ${log}
                              </div>`;
@@ -190,12 +195,9 @@ function renderLogsData(data) {
         logsContainer.innerHTML = logsHtml;
     }
 
-    // 2. RENDERIZAR ALERTAS (Basado en los logs recibidos)
     if (alertContainer) {
-        // Filtramos mensajes críticos
         const errors = logs.filter(log => log && (log.includes("ERROR") || log.includes("ALERTA")));
         
-        // Solo mostramos alerta si hay errores Y no hay un error crítico de conexión ya mostrándose
         if (errors.length > 0 && !alertContainer.innerHTML.includes("Sin conexión")) {
             const lastError = errors[errors.length - 1];
             alertContainer.innerHTML = `
@@ -208,14 +210,11 @@ function renderLogsData(data) {
     }
 }
 
-// --- INICIO DE EJECUCIÓN ---
 
-// Llamada inicial
 fetchSystemStatus(); 
 fetchLogs();
+fetchDrivers();
 
-// 1. Refresco rápido para CPs (Tiempo real - 2 seg)
-setInterval(fetchSystemStatus, 2000); 
-
-// 2. Refresco medio para Logs (Para no saturar - 4 seg)
+setInterval(fetchSystemStatus, 2000);
 setInterval(fetchLogs, 4000);
+setInterval(fetchDrivers, 2000);

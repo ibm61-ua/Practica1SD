@@ -21,12 +21,9 @@ echo.
 
 rem ==== Ejecutar Engine ====
 echo Iniciando ENGINE...
-start "%nombre_cp% ENGINE" java -jar EV_CP_E.jar %ip_broker%:9092 %port_engine%
+start "%nombre_cp% ENGINE" javaw -jar EV_CP_E.jar %ip_broker%:9092 %port_engine%
 
 rem ==== Ejecutar Monitor ====
 echo Iniciando MONITOR...
-start "%nombre_cp% MONITOR" java -jar EV_CP_M.jar "%ip_engine%:%port_engine%" "%ip_central%:%port_central%" "%ip_registry%:%port_registry%" "%port_api_auth%" "%nombre_cp%"
+start "%nombre_cp% MONITOR" javaw -jar EV_CP_M.jar "%ip_engine%:%port_engine%" "%ip_central%:%port_central%" "%ip_registry%:%port_registry%" "%port_api_auth%" "%nombre_cp%"
 
-
-echo.
-echo === CP %nombre_cp% iniciado correctamente ===

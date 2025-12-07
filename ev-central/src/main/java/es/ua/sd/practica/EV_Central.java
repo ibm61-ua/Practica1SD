@@ -45,7 +45,7 @@ public class EV_Central {
 			System.err.println("Pase por argumentos el puerto del socket, la IP y puerto del broker, la IP de la base de datos, el puerto de la API de EV_w y el puerto de la API de autenticacion ");
 			return;
 		}
-		gui = new CentralMonitorGUI(cps);
+		gui = new CentralMonitorGUI(cps, CPKeys);
 		port = Integer.parseInt(args[0]);
         brokerIP = args[1];
         API_PORT = Integer.parseInt(args[3]);
@@ -58,12 +58,6 @@ public class EV_Central {
 
         dbManager = new DatabaseManager(IP_DATABASE, DB_NAME, DB_USER, DB_PASS);
         dbManager.createTable();
-		
-        SwingUtilities.invokeLater(() -> {
-            AddCPToGui(gui);
-            OnGoingPanel(gui);
-            MessagePanel(gui);
-        });
         
         String topicRequest = CommonConstants.REQUEST; 
         String topicTelemetry = CommonConstants.TELEMETRY;
@@ -136,14 +130,6 @@ public class EV_Central {
 	    return json;
     }
 	
-	private static void AddCPToGui(CentralMonitorGUI gui) {
-		for(CP cp : cps)
-		{
-			gui.addChargingPoint(cp);
-		}
-		
-	}
-	
 	public static void Serialize()
 	{
 		for (CP cp : cps)
@@ -154,8 +140,17 @@ public class EV_Central {
 	
 	protected static void refreshChargingPoints(CentralMonitorGUI gui) {
 		Serialize();
-	    gui.clearAllChargingPoints(); 
-	    AddCPToGui(gui); 
+		if (gui != null) {
+	        gui.refreshChargingPoints(); 
+	    } 
+	}
+	
+	protected static void refreshLog()
+	{
+		if (gui != null)
+		{
+			gui.updateAuditLog();
+		}
 	}
 
 
@@ -197,16 +192,6 @@ public class EV_Central {
 	        }
 	    }
 	    return false;
-	}
-	
-	public static void OnGoingPanel(CentralMonitorGUI gui)
-	{
-		 gui.OnGoingPanel("");
-	}
-	
-	public static void MessagePanel(CentralMonitorGUI gui)
-	{
-		 gui.MessagePanel("");
 	}
     
 }

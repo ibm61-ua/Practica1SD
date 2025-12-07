@@ -1,2 +1,2 @@
-ip_broker=192.168.56.1
+ip_broker=192.168.1.38
 name_driver=DV001

@@ -2,7 +2,7 @@
 
 #Engine: el puerto debe ser único por CP, es decir, dos CPS no pueden tener el mismo puerto
 ip_engine=192.168.1.38
-port_engine=9005
+port_engine=9007
 
 #Kafka: Ip del PC donde esta iniciado kafka
 ip_broker=192.168.1.38
@@ -17,4 +17,4 @@ ip_registry=192.168.1.38
 port_registry=8088
 
 #El nombre del cp, este debe existir en la base de datos, sino, hay que darlo de alta
-nombre_cp=MAD
+nombre_cp=BAR

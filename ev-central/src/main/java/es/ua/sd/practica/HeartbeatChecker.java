@@ -38,7 +38,7 @@ public class HeartbeatChecker extends EV_Central implements Runnable {
             }
 
             try {
-                Thread.sleep(1000); // 10 segundos
+                Thread.sleep(1000);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }

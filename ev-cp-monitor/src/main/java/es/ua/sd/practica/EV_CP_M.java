@@ -27,7 +27,7 @@ public class EV_CP_M {
 		DeserializeARGS(args);
 		
 		SwingUtilities.invokeLater(() -> {
-			gui = new MonitorGUI(ID_CP, IP_port_registry, IP_Central + ":" + Port_API_Central);
+			gui = new MonitorGUI(ID_CP, IP_port_registry, IP_Central + ":" + Port_API_Central, IP_Engine, Port_Engine);
 			Runnable Connection =  new ConnectionToEngine(ID_CP, IP_Engine, Port_Engine);
 			new Thread(Connection).start();
 			Runnable KeepAlive = new MonitorKeepAlive(IP_Central, Port_Central, ID_CP, gui);

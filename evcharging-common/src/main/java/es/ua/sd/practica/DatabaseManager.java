@@ -80,7 +80,6 @@ public class DatabaseManager {
             pstmt.setString(1, estado);
             pstmt.setString(2, nombre);
             pstmt.executeUpdate();
-            System.out.println("Estado de CP " + nombre + " actualizado a " + estado);
         } catch (SQLException e) {
             System.err.println("Error al actualizar el estado del CP.");
             e.printStackTrace();

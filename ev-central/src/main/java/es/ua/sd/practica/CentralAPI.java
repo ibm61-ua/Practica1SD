@@ -59,6 +59,11 @@ public class CentralAPI extends EV_Central implements Runnable {
             return jsonStatus;
         });
         
+        publicService.get("/api/status/driver", (request, response) -> {
+            response.type("application/json");
+            return GSON.toJson(super.gui.ongoingBuffer);
+        });
+        
         publicService.get("/api/status/log", (request, response) -> {
             response.type("application/json");
             String jsonStatus = RegistroDeAuditoria.LogToJson(); 
@@ -84,7 +89,7 @@ public class CentralAPI extends EV_Central implements Runnable {
             try (FileInputStream fis = new FileInputStream(f)) {
                 ksCargado.load(fis, KEYSTORE_PASS.toCharArray());
             }
-            System.out.println("Archivo Keystore cargado correctamente.");
+            RegistroDeAuditoria.NewLog(super.IP_DATABASE, "Carga Keystore correcta", "Archivo Keystore cargado correctamente.");
             
             boolean tieneConfianza = false;
             for (String alias : Collections.list(ksCargado.aliases())) {
@@ -160,20 +165,25 @@ public class CentralAPI extends EV_Central implements Runnable {
             String cpId = alerta.get("cp_id");
             String message = alerta.get("message");
             String severity = alerta.get("severity");
+            String temp = alerta.get("temp");
 
             String logMessage;
-            if ("HIGH".equals(severity)) {
-                logMessage = "[ALERTA CLIMÁTICA] " + message;
-            } else {
-                logMessage = "[CLIMA INFO] " + message;
-            }
-
-            RegistroDeAuditoria.NewLog(logMessage);
+            
 
             if (cpId != null) {
                 for (CP cp : cps) {
                     if (cp.UID.equals(cpId)) {
-                        if ("HIGH".equals(severity)) {
+                    	cp.temperature = Double.parseDouble(temp);
+                    	if ("HIGH".equals(severity)) {
+                            logMessage = "[EV_w] CP: "+cpId + " " + message;
+                            RegistroDeAuditoria.NewLog(super.IP_DATABASE, "ALERT", logMessage);
+                        } else if ("INFO".equals(severity)) {
+                            logMessage = "[EV_w] CP: "+cpId + " "+ message;
+                            RegistroDeAuditoria.NewLog(super.IP_DATABASE, "INFO", logMessage);
+                        }
+
+                        
+                        if ("HIGH".equals(severity) && !"DESCONECTADO".equals(cp.State)) {
                             cp.State = "PARADO"; 
                         } else if ("INFO".equals(severity)) {
                             if ("PARADO".equals(cp.State)) {
@@ -200,7 +210,7 @@ public class CentralAPI extends EV_Central implements Runnable {
             
             if (cpCert == null) {
             	Peticion registroData = gson.fromJson(request.body(), Peticion.class);
-            	RegistroDeAuditoria.NewLog("[Auth] Autenticación rechazada: No hay certificado. CP:" + registroData.id);
+            	RegistroDeAuditoria.NewLog(request.ip(), "Auth",  "Autenticación rechazada: No hay certificado. CP:" + registroData.id);
                 response.status(401); 
                 return gson.toJson(Map.of("status", "ERROR", "message", "Certificado requerido."));
             }
@@ -211,7 +221,7 @@ public class CentralAPI extends EV_Central implements Runnable {
 
             if (cpIdFromCert == null || !cpIdFromCert.equals(registroData.id)) {
                 response.status(403);
-                RegistroDeAuditoria.NewLog("[Auth] Autenticación rechazada: ID no coindice del certificado no coincide.");
+                RegistroDeAuditoria.NewLog(request.ip(), "Auth",  "Autenticación rechazada: ID no coindice del certificado no coincide.");
                 return gson.toJson(Map.of("status", "ERROR", "message", "ID no coincide."));
             }
             
@@ -226,7 +236,7 @@ public class CentralAPI extends EV_Central implements Runnable {
             CPKeys.put(registroData.id, keyObj);
             
             response.status(200);
-            RegistroDeAuditoria.NewLog("[Auth] Autenticación aceptada CP:" + registroData.id);
+            RegistroDeAuditoria.NewLog(request.ip(), "Auth",  "[Auth] Autenticación aceptada CP:" + registroData.id);
             return gson.toJson(Map.of("status", "SUCCESS", "id", registroData.id, "key", clave));
         });
     }

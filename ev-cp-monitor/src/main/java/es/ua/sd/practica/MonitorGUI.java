@@ -72,6 +72,9 @@ public class MonitorGUI extends JFrame {
     private static final OkHttpClient client;
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
     
+    private static int portEngine;
+    private static String ipEngine;
+    
     private static SecretKey sessionKey;
 
     static {
@@ -107,9 +110,11 @@ public class MonitorGUI extends JFrame {
             .build();
     }
 
-    public MonitorGUI(String name, String EV_registry, String Central) {
+    public MonitorGUI(String name, String EV_registry, String Central, String ipEngine, int portEngine) {
         super(name + " - Monitor");
         this.name = name;
+        this.ipEngine = ipEngine;
+        this.portEngine = portEngine;
         
         API_REGISTRY = "https://" + EV_registry + "/api/registry/register";
         API_BAJA = "https://" + EV_registry  + "/api/registry/delete";
@@ -278,6 +283,13 @@ public class MonitorGUI extends JFrame {
                     Key k = GSON.fromJson(jsonResponse, Key.class);
                     sessionKey = CryptoUtils.stringToKey(k.key);
                     NewMessage("[Monitor] Guarda clave de crifrado.");
+                    EVClient cpClient = new EVClient(ipEngine, portEngine);
+                    boolean isConnected = cpClient.startConnection();
+                    if(isConnected)
+                    {
+                    	String statusRequest = "KEY#"+k.key;
+                    	cpClient.sendMessage(statusRequest); 
+                    }
                 } else {
                     NewMessage("Error Autenticación: " + response.code() + " " + response.body().string());
                 }

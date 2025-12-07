@@ -12,25 +12,20 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import javax.crypto.SecretKey;
+
 public class CentralLogic extends EV_Central {
 	private final Map<String, Instant> lastHeartbeat = new ConcurrentHashMap<>();
 	public void handleRequest(String message) {
-		//Si el driver pide actualizar los CPS
-		// ejemplo: REQUEST#1|ALC|Alicante|0.35|DESCONECTADO#10.0#DV001
-		if(message.equals("RELOAD"))
-		{
-			handleReload();
-			return;
-		}
-		
+		System.out.println("[DRIVER] " + message);
 		String kwh = null;
 		for(CP cp : cps)
 		{
-			if(cp.UID.equals(message.split("#")[1].split("\\|")[1]))
+			if(cp.UID.equals(message.split("#")[1].split(";")[0]))
 			{
 				if(cp.State.equals("DESCONECTADO") || cp.State.equals("AVERIADO") || cp.State.equals("PARADO") || cp.State.equals("CARGANDO") )
 				{
-					Producer r = new Producer(super.brokerIP, CommonConstants.TELEMETRY);
+					Producer r = new Producer(super.brokerIP, CommonConstants.CONTROL);
 					r.sendMessage("NOAVIABLE#" + message.split("#")[3]);
 					r.close();
 					return;
@@ -45,60 +40,99 @@ public class CentralLogic extends EV_Central {
 		LocalDateTime ahora = LocalDateTime.now();
 		DateTimeFormatter formato = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
 		String fechaHora = ahora.format(formato);
-		String m = fechaHora + "   "  + message.split("#")[1].split("\\|")[1] + "   "  + message.split("#")[2] + "   "  + message.split("#")[3];
-        gui.OnGoingPanel(m);
+		String m = fechaHora + "   "  + message.split("#")[1].split(";")[0] + "   "  + message.split("#")[2] + "   "  + message.split("#")[3];
+        gui.addOngoingMessage(m);
         
         Producer r = new Producer(super.brokerIP, CommonConstants.REQUEST_CP);
-		r.sendMessage(message + "#" + kwh);
+        
+        String cpid = message.split("#")[1].split(";")[0];
+        SecretKey key = CPKeys.get(cpid);
+        String encryptedMessage = "";
+		try {
+			encryptedMessage = CryptoUtils.cifrar(message + "#" + kwh, key);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		r.sendMessage(cpid + "$" + encryptedMessage);
 		r.close();
     }
 
-    private void handleReload() {
-    	String message = "RELOAD#";
+
+    public void handleTelemetry(String message) {
+    	System.out.println("[ENGINE] Mensaje encriptado: " + message);
     	
-    	for (CP cp : cps)
-    	{
-    		message += cp.toString() + "|";
-    	}
-    	Producer r = new Producer(super.brokerIP, CommonConstants.CONTROL);
-		r.sendMessage(message);
-		r.close();
-	}
+    	String cpid = message.split("\\$")[0];
+		String encryptedMessage = message.split("\\$")[1];
+		SecretKey key = CPKeys.get(cpid);
+		String decryptedMessage = "";
+		try {
+			decryptedMessage = CryptoUtils.descifrar(encryptedMessage, key);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		System.out.println("[ENGINE] Mensaje desencriptado: " + decryptedMessage);
+		
+		if (decryptedMessage.contains("REJECT"))
+		{
+			Producer r = new Producer(super.brokerIP, CommonConstants.CONTROL);
+	        r.sendMessage(decryptedMessage);
+	        r.close();
+	        String cpId = decryptedMessage.split("#")[1];
+	        for (CP cp : cps) {
+                if (cp.UID.equals(cpId)) {
+                    
+                    cp.State = "CONECTADO"; 
+                    if (gui != null) {
+                        gui.removeOngoingMessage(cpId);
 
-	public void handleTelemetry(String message) {
-		String telemetry = message;
-    	if(message.contains("END"))
-    	{
-    		for(CP cp : cps)
-    		{
-    			if(cp.UID.equals(message.split("#")[1]))
-    			{
-    				cp.State = "CONECTADO";
-    				Iterator<String> it = gui.rBuffer.iterator();
-    				String part = message.split("#")[1];
+                        refreshChargingPoints(gui);
 
-    				while (it.hasNext()) {
-    				    String s = it.next();
-    				    if (s.contains(part)) {
-    				        it.remove();
-    				    }
-    				}
-    				gui.OnGoingPanel("");
-    				gui.refreshChargingPoints();
-    				telemetry += "#Precio: " + Float.parseFloat(cp.Price) * cp.KWHRequested + " euros.";
-    			}
-    		}
-    		gui.deleteOnGoinMessage(message.split("#")[1]);
-    	}
+                        RegistroDeAuditoria.NewLog(cpId, "Recarga", cpId + " rechazó la recarga de " + decryptedMessage.split("#")[2]);
+                        gui.updateAuditLog();
+                    }
+                    
+                    break; 
+                }
+            }
+	        return;
+		}
+		
+        if (decryptedMessage.contains("END")) {
+            
+            String cpId = decryptedMessage.split("#")[1]; // Extraemos el ID (ej. SEV10)
+
+            for (CP cp : cps) {
+                if (cp.UID.equals(cpId)) {
+                    
+                    cp.State = "CONECTADO"; 
+                    
+                    float costeFinal = Float.parseFloat(cp.Price) * cp.KWHRequested;
+                    decryptedMessage += "#Precio: " + costeFinal + " euros.";
+
+                    if (gui != null) {
+                        gui.removeOngoingMessage(cpId);
+
+                        refreshChargingPoints(gui);
+
+                        RegistroDeAuditoria.NewLog(cpId, "Recarga" , "FIN DE CARGA: " + cpId + " | Coste: " + costeFinal + "€");
+                        gui.updateAuditLog();
+                    }
+                    
+                    break; 
+                }
+            }
+        }
+
         Producer r = new Producer(super.brokerIP, CommonConstants.CONTROL);
-		r.sendMessage(telemetry);
-		r.close();
+        r.sendMessage(decryptedMessage);
+        r.close();
     }
     
     public void handleCP(String message)
     {
-    	String type = message.split("#")[0]; //ejemplo mensaje CONNECTION#CP001 -> buscamos el CONNECTION
-    	String cpUID = message.split("#")[1]; //ejemplo mensaje CONNECTION#CP001 -> buscamos el CP001
+    	String type = message.split("#")[0]; 
+    	String cpUID = message.split("#")[1];
     	
     	
     	this.getLastHeartbeat().put(cpUID, Instant.now());
@@ -110,6 +144,7 @@ public class CentralLogic extends EV_Central {
         		if(cp.UID.equals(cpUID) && !cp.State.equals("CONECTADO") && cp.autenticado)
         		{
         			cp.State = "CONECTADO";
+        			RegistroDeAuditoria.NewLog(cpUID, "Charging Point" , cpUID + " esta ahora conectado.");
         			javax.swing.SwingUtilities.invokeLater(() -> refreshChargingPoints(gui));
         		}
         	}
@@ -121,6 +156,7 @@ public class CentralLogic extends EV_Central {
         		if(cp.UID.equals(cpUID) && cp.State.equals("DESCONECTADO") && cp.autenticado)
         		{
         			cp.State = "CONECTADO";
+        			RegistroDeAuditoria.NewLog(cpUID, "Charging Point" , cpUID + " esta ahora conectado.");
         			javax.swing.SwingUtilities.invokeLater(() -> refreshChargingPoints(gui));
         		}
         	}
@@ -132,10 +168,13 @@ public class CentralLogic extends EV_Central {
         		if(cp.UID.equals(cpUID) && cp.autenticado)
         		{
         			cp.State = "AVERIADO";
+        			RegistroDeAuditoria.NewLog(cpUID, "Charging Point" , cpUID + " esta averiado.");
         			javax.swing.SwingUtilities.invokeLater(() -> refreshChargingPoints(gui));
         		}
         	}
     	}
+    	
+    	refreshLog();
     	
     }
 

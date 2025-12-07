@@ -36,8 +36,6 @@ public class EV_W {
     private static List<CP> cps;
     private static final Map<String, Boolean> alertStatus = new HashMap<>();
 
-    // NUEVO: Mapa para guardar las simulaciones (ConcurrentHashMap es thread-safe)
-    // Clave: Ubicación Real -> Valor: Ubicación Simulada
     private static final Map<String, String> locationOverrides = new ConcurrentHashMap<>();
 
     public static void main(String[] args) throws IOException {
@@ -47,13 +45,11 @@ public class EV_W {
     	API_KEY = args[2];
         System.out.println("--- MÓDULO DE CLIMA INICIADO ---");
         System.out.println("   SIMULACIÓN: Escribe 'Origen Destino' para cambiar la ubicación.");
-        System.out.println("   Ejemplo: 'Alicante Helsinki' (Para forzar frío)");
+        System.out.println("   Ejemplo: 'Alicante Oymyakon' (Para forzar frío)");
         System.out.println("   Escribe 'reset' para borrar simulaciones.");
 
-        // 1. INICIAR HILO DE ESCUCHA DE CONSOLA
         startConsoleListener();
 
-        // 2. BUCLE PRINCIPAL (CLIMA)
         while(true) {
             try {
                 GetCentralAPI();
@@ -67,7 +63,6 @@ public class EV_W {
         }
     }
 
-    // --- NUEVO MÉTODO: Hilo que escucha tu teclado ---
     private static void startConsoleListener() {
         Thread inputThread = new Thread(() -> {
             Scanner scanner = new Scanner(System.in);
@@ -78,7 +73,7 @@ public class EV_W {
                     locationOverrides.clear();
                     System.out.println(">> Simulaciones borradas. Usando ubicaciones reales.");
                 } else {
-                    String[] parts = line.split("\\s+"); // Separar por espacios
+                    String[] parts = line.split("\\s+"); 
                     if (parts.length == 2) {
                         String real = parts[0];
                         String simulada = parts[1];
@@ -90,7 +85,7 @@ public class EV_W {
                 }
             }
         });
-        inputThread.setDaemon(true); // El hilo morirá si el programa principal termina
+        inputThread.setDaemon(true);
         inputThread.start();
     }
 
@@ -131,51 +126,50 @@ public class EV_W {
         for(CP cp : cps) {
             if(cp.Location != null && !cp.Location.isEmpty()) {
                 
-                // --- LÓGICA DE SIMULACIÓN ---
                 String ubicacionParaConsultar = cp.Location;
                 String extraInfo = "";
 
-                // Verificamos si hay una simulación activa para esta ciudad
                 if (locationOverrides.containsKey(cp.Location)) {
                     ubicacionParaConsultar = locationOverrides.get(cp.Location);
                     extraInfo = " [SIMULANDO: " + ubicacionParaConsultar + "]";
                 }
-                // -----------------------------
 
                 double temp = GetTemp(ubicacionParaConsultar);
                 System.out.println("CP: " + cp.UID + " | Loc: " + cp.Location + extraInfo + " | Temp: " + temp + "ºC");
 
+                enviarNotificacion(cp.UID, cp.Location, temp, "UPDATE", "Actualización clima: " + temp + "ºC");
                 boolean estaEnAlertaPrevia = alertStatus.getOrDefault(cp.UID, false);
 
                 if(temp < 0) {
                     System.out.println("NUEVA ALERTA: " + cp.UID + " bajo cero.");
                     String msg = "ALERTA CLIMÁTICA: Temp crítica (" + temp + "ºC)" + extraInfo;
                     
-                    enviarAlerta(cp.UID, cp.Location, temp, "HIGH", msg);
+                    enviarNotificacion(cp.UID, cp.Location, temp, "HIGH", msg);
                     alertStatus.put(cp.UID, true);
                 }
 
                 else if (temp >= 0 && estaEnAlertaPrevia) {
                     System.out.println("RECUPERACIÓN: " + cp.UID + " temperatura normalizada.");
-                    enviarAlerta(cp.UID, cp.Location, temp, "INFO", "RECUPERACIÓN: Temp normalizada (" + temp + "ºC)");
+                    enviarNotificacion(cp.UID, cp.Location, temp, "INFO", "RECUPERACIÓN: Temp normalizada (" + temp + "ºC)");
                     alertStatus.put(cp.UID, false);
                 }
             }
         }
     }
-
-    private static void enviarAlerta(String cpId, String location, double temp, String severity, String message) {
+    
+    private static void enviarNotificacion(String cpId, String location, double temp, String severity, String message) {
         OkHttpClient client = new OkHttpClient();
         Gson gson = new Gson();
 
-        Map<String, Object> alertaData = Map.of(
+        Map<String, Object> data = Map.of(
             "type", "WEATHER_ALERT",
             "cp_id", cpId,
             "message", message,
-            "severity", severity 
+            "severity", severity,
+            "temp", temp
         );
 
-        String jsonBody = gson.toJson(alertaData);
+        String jsonBody = gson.toJson(data);
         RequestBody body = RequestBody.create(jsonBody, JSON_MEDIA);
 
         Request request = new Request.Builder()
@@ -191,6 +185,7 @@ public class EV_W {
             System.err.println("Fallo de conexión enviando notificación: " + e.getMessage());
         }
     }
+
 
     private static void ParseJSON(String jsonResponse) {
         Gson gson = new Gson();

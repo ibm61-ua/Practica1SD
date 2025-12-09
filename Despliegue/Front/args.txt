@@ -1,5 +1,5 @@
 PORT=8080
-HOST=192.168.1.38
-API_CP=http://192.168.1.38:3000/api/status/cp
-API_LOG=http://192.168.1.38:3000/api/status/log
-API_DRIVER=http://192.168.1.38:3000/api/status/driver
+HOST=172.21.243.178
+API_CP=http://172.21.243.178:3000/api/status/cp
+API_LOG=http://172.21.243.178:3000/api/status/log
+API_DRIVER=http://172.21.243.178:3000/api/status/driver

@@ -21,7 +21,7 @@ public class EV_Driver {
 	public static DriverGUI gui;
 	public static void main(String[] args) {
 		if (args.length < 2) {
-			System.err.println("Introduce IP y puerto del EV_CP_E" + ", ID del Driver");
+			System.err.println("Introduce IP y puerto del broker" + ", ID del Driver");
 			return;
 		}
 		DeserializeARGS(args);

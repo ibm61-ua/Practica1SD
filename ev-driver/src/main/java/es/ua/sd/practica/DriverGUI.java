@@ -33,6 +33,7 @@ public class DriverGUI extends JFrame {
         super(name + " - Driver Client");
         this.producer = p;
         this.name = name;
+        this.ip = ip;
         
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setSize(1300, 700);
@@ -175,7 +176,8 @@ public class DriverGUI extends JFrame {
                 String DB_NAME = "evcharging_db";
                 String DB_USER = "evcharging";
                 String DB_PASS = "practica2";
-                DatabaseManager db = new DatabaseManager("192.168.1.38", DB_NAME, DB_USER, DB_PASS);
+                System.out.println(ip);
+                DatabaseManager db = new DatabaseManager(ip, DB_NAME, DB_USER, DB_PASS);
                 
                 List<String> cpsString = db.GetAllCPS();
                 

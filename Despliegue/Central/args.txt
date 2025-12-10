@@ -1,5 +1,5 @@
 port_cps=8888
-broker_kafka=172.21.243.178:9092
-database_ip=172.21.243.178
+broker_kafka=172.21.243.234:9092
+database_ip=172.21.243.234
 api_auth=8082
 api_port=3000

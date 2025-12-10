@@ -183,7 +183,7 @@ public class CentralAPI extends EV_Central implements Runnable {
                         }
 
                         
-                        if ("HIGH".equals(severity) && !"DESCONECTADO".equals(cp.State)) {
+                        if ("HIGH".equals(severity) && !"DESCONECTADO".equals(cp.State) && !"CARGANDO".equals(cp.State))  {
                             cp.State = "PARADO"; 
                         } else if ("INFO".equals(severity)) {
                             if ("PARADO".equals(cp.State)) {

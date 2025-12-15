@@ -132,6 +132,7 @@ public class DriverGUI extends JFrame {
                 
                 Scanner s = new Scanner(archivo);
                 SwingUtilities.invokeLater(() -> Log("Iniciando script de suministro..."));
+                
 
                 while (s.hasNextLine()) {
                     if (Suministrando) {
@@ -147,6 +148,7 @@ public class DriverGUI extends JFrame {
                     String kwh = partes[2];
 
                     for (CP cp : cps) {
+                    	System.out.println(cp.UID);
                         if (cp.UID.equals(targetId)) {
                             Suministrando = true;
                             String request = "REQUEST#" + cp.UID + ";" + cp.Price + ";" + cp.Location + "#" + kwh + "#" + name + "#" + cp.Price;
@@ -192,7 +194,8 @@ public class DriverGUI extends JFrame {
                         JButton btn = new JButton("<html><center><b>" + cpId + "</b><br>Iniciar Carga</center></html>");
                         btn.setPreferredSize(new Dimension(120, 60));
                         btn.setBackground(new Color(230, 230, 230));
-                        
+                        CP cp = new CP(cpId, parts[3], parts[2], parts[4]);
+                        cps.add(cp);
                         CreateButtonAction(btn, s);
                         containerCPs.add(btn);
                     }

@@ -31,7 +31,7 @@ public class CentralLogic extends EV_Central {
 					return;
 				}
 				kwh = cp.Price;
-				cp.State = "CARGANDO";
+				
 				cp.driver = message.split("#")[3];
 				cp.KWHRequested = Float.parseFloat(message.split("#")[2]);
 				gui.refreshChargingPoints();
@@ -72,6 +72,25 @@ public class CentralLogic extends EV_Central {
 		}
 		
 		System.out.println("[ENGINE] Mensaje desencriptado: " + decryptedMessage);
+		
+		if (decryptedMessage.contains("CHARGING"))
+		{
+	        String cpId = decryptedMessage.split("#")[1];
+	        for (CP cp : cps) {
+                if (cp.UID.equals(cpId)) {
+                    
+                    cp.State = "CARGANDO"; 
+                    if (gui != null) {
+                        gui.removeOngoingMessage(cpId);
+
+                        refreshChargingPoints(gui);
+                    }
+                    
+                    break; 
+                }
+            }
+	        return;
+		}
 		
 		if (decryptedMessage.contains("REJECT"))
 		{

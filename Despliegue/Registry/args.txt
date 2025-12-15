@@ -1,2 +1,2 @@
-DatabaseIP=172.21.243.234
+DatabaseIP=192.168.1.38
 APIPort=8088

@@ -9,4 +9,4 @@ for /f "tokens=1,2 delims==" %%a in (config_driver.txt) do (
         )
     )
 )
-java -jar EV_DRIVER.jar %ip_broker%:9092 %name_driver%
+javaw -jar EV_DRIVER.jar %ip_broker%:9092 %name_driver%

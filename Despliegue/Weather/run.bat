@@ -10,4 +10,4 @@ for /f "tokens=1,2 delims==" %%a in (args.txt) do (
     )
 )
 
-java -jar EV_W.jar %API_STATUS_CP% %API_ALERT% %API_KEY_OPENWEATHER%
+javaw -jar EV_W.jar %API_STATUS_CP% %API_ALERT% %API_KEY_OPENWEATHER%
